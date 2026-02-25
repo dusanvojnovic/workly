@@ -74,6 +74,11 @@ export const lightTheme = createTheme({
 		button: { textTransform: 'none', fontWeight: 600 },
 	},
 	components: {
+		MuiTextField: {
+			defaultProps: {
+				size: 'small',
+			},
+		},
 		MuiPaper: {
 			styleOverrides: {
 				root: {
@@ -157,6 +162,11 @@ export const darkTheme = createTheme({
 		button: { textTransform: 'none', fontWeight: 600 },
 	},
 	components: {
+		MuiTextField: {
+			defaultProps: {
+				size: 'small',
+			},
+		},
 		MuiPaper: {
 			styleOverrides: {
 				root: {

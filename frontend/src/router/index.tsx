@@ -6,20 +6,25 @@ import {
 	Outlet,
 	redirect,
 } from '@tanstack/react-router';
+import { AppLayout } from '../layout/AppLayout';
 import { LoginPage } from '../pages/LoginPage';
+import { RegisterPage } from '../pages/RegisterPage';
 import { useAuthStore } from '../store/auth.store';
 
 const rootRoute = createRootRoute({
-	component: () => <Outlet />,
-	notFoundComponent: () => (
-		<div style={{ fontSize: 40 }}>ROUTER LOADED BUT NOT FOUND</div>
-	),
+	component: () => <AppLayout />,
 });
 
 const loginRoute = createRoute({
 	getParentRoute: () => rootRoute,
 	path: '/login',
 	component: LoginPage,
+});
+
+const registerRoute = createRoute({
+	getParentRoute: () => rootRoute,
+	path: '/register',
+	component: RegisterPage,
 });
 
 const protectedRoute = createRoute({
@@ -29,6 +34,7 @@ const protectedRoute = createRoute({
 		const token = useAuthStore.getState().token;
 		if (!token) throw redirect({ to: '/login' });
 	},
+	component: Outlet,
 });
 
 const dashboardRoute = createRoute({
@@ -39,6 +45,7 @@ const dashboardRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
 	loginRoute,
+	registerRoute,
 	protectedRoute.addChildren([dashboardRoute]),
 ]);
 

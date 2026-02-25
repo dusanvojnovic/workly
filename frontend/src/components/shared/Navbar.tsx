@@ -1,14 +1,6 @@
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
-import {
-	AppBar,
-	Box,
-	Button,
-	IconButton,
-	Toolbar,
-	Typography,
-} from '@mui/material';
-import { Link } from '@tanstack/react-router';
+import { AppBar, IconButton, Toolbar, Typography } from '@mui/material';
 import { useThemeMode } from '../../theme/mode';
 
 export const Navbar = () => {
@@ -26,27 +18,10 @@ export const Navbar = () => {
 				borderColor: 'divider',
 			}}
 		>
-			<Toolbar sx={{ gap: 2 }}>
+			<Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
 				<Typography variant="h5" sx={{ fontWeight: 700 }}>
-					Workly
+					BookMe
 				</Typography>
-
-				<Box sx={{ display: 'flex', gap: 1, flex: 1 }}>
-					<Button
-						component={Link}
-						to="/smth"
-						sx={{
-							textTrasform: 'none',
-							color: 'text.primary',
-							'&:hover': {
-								color: 'text.secondary',
-								backgroundColor: 'transparent',
-							},
-						}}
-					>
-						Smth
-					</Button>
-				</Box>
 
 				<IconButton
 					onClick={toggleMode}
