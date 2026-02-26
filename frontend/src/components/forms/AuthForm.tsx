@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useAuthStore } from '../../store/auth.store';
 
@@ -31,7 +31,10 @@ const registerSchema = z
 			.string()
 			.min(6, 'Password must be at least 6 characters long'),
 		role: z.enum(['customer', 'provider']),
-		companyName: z.string().optional(),
+		companyName: z
+			.string()
+			.transform((v) => (v?.trim() ? v.trim() : undefined))
+			.optional(),
 	})
 	.superRefine((val, ctx) => {
 		if (
@@ -183,6 +186,7 @@ function RegisterInner() {
 	const {
 		register,
 		handleSubmit,
+		control,
 		watch,
 		formState: { errors, isSubmitting },
 	} = useForm<RegisterFormData>({
@@ -196,20 +200,39 @@ function RegisterInner() {
 	});
 
 	const role = watch('role');
+	const roleMap = { customer: 'CUSTOMER', provider: 'PROVIDER' };
 
 	const onSubmit = handleSubmit(async (data) => {
 		setServerError(null);
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const payload: any = {
+			email: data.email,
+			password: data.password,
+			role: roleMap[data.role],
+		};
+		if (data.role === 'provider') {
+			payload.companyName = data.companyName;
+		}
 		try {
 			await registerUser(data);
 			navigate({ to: '/dashboard' });
 		} catch (e: unknown) {
 			const message =
 				typeof e === 'object' && e !== null && 'response' in e
-					? (e as { response?: { data?: { message?: string } } })
-							.response?.data?.message
+					? (
+							e as {
+								response?: {
+									data?: { message?: string | string[] };
+								};
+							}
+						).response?.data?.message
 					: undefined;
 
-			setServerError(message ?? 'An error occurred');
+			setServerError(
+				Array.isArray(message)
+					? message.join(', ')
+					: (message ?? 'An error occurred'),
+			);
 		}
 	});
 
@@ -247,18 +270,25 @@ function RegisterInner() {
 					helperText={errors.password?.message}
 				/>
 
-				<TextField
-					select
-					label="Account type"
-					fullWidth
-					margin="normal"
-					{...register('role')}
-					error={!!errors.role}
-					helperText={errors.role?.message}
-				>
-					<MenuItem value="customer">Customer</MenuItem>
-					<MenuItem value="provider">Provider</MenuItem>
-				</TextField>
+				<Controller
+					name="role"
+					control={control}
+					render={({ field }) => (
+						<TextField
+							select
+							label="Account type"
+							fullWidth
+							margin="normal"
+							value={field.value ?? 'customer'}
+							onChange={field.onChange}
+							error={!!errors.role}
+							helperText={errors.role?.message}
+						>
+							<MenuItem value="customer">Customer</MenuItem>
+							<MenuItem value="provider">Provider</MenuItem>
+						</TextField>
+					)}
+				/>
 
 				{role === 'provider' && (
 					<TextField

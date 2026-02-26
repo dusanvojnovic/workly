@@ -21,10 +21,18 @@ export type RegisterPayload = {
 	companyName?: string;
 };
 
+export type Role = 'CUSTOMER' | 'PROVIDER';
+
+export type AuthUser = {
+	id: string;
+	role: Role;
+};
+
 export type AuthStore = {
 	token: string | null;
-	setToken: (token: string | null) => void;
-	login: (payload: LoginPayload) => Promise<void>;
+	user: AuthUser | null;
+	initAuth: () => void;
 	logout: () => void;
+	login: (payload: LoginPayload) => Promise<void>;
 	register: (payload: RegisterPayload) => Promise<void>;
 };

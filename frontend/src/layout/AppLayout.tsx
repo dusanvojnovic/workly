@@ -1,8 +1,16 @@
 import { Box, Container } from '@mui/material';
 import { Outlet } from '@tanstack/react-router';
+import { useEffect } from 'react';
 import { Navbar } from '../components/shared/Navbar';
+import { useAuthStore } from '../store/auth.store';
 
 export function AppLayout() {
+	const initAuth = useAuthStore((s) => s.initAuth);
+
+	useEffect(() => {
+		initAuth();
+	}, [initAuth]);
+
 	return (
 		<Box
 			sx={{
