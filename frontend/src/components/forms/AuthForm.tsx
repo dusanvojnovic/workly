@@ -6,10 +6,14 @@ import {
 	Card,
 	CardContent,
 	Divider,
+	IconButton,
+	InputAdornment,
 	MenuItem,
 	TextField,
 	Typography,
 } from '@mui/material';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -17,6 +21,14 @@ import { z } from 'zod';
 import { useAuthStore } from '../../store/auth.store';
 
 type Mode = 'login' | 'register';
+
+const SERVICE_CATEGORY_OPTIONS = [
+	'SPORT',
+	'BUSINESS',
+	'EVENTS',
+	'FOOD',
+	'WELLNESS',
+] as const;
 
 const loginSchema = z.object({
 	email: z.email('Invalid email'),
@@ -35,6 +47,7 @@ const registerSchema = z
 			.string()
 			.transform((v) => (v?.trim() ? v.trim() : undefined))
 			.optional(),
+		serviceCategory: z.enum(SERVICE_CATEGORY_OPTIONS).optional(),
 	})
 	.superRefine((val, ctx) => {
 		if (
@@ -45,6 +58,14 @@ const registerSchema = z
 				code: 'custom',
 				message: 'Add company name (min 2 characters)',
 				path: ['companyName'],
+			});
+		}
+
+		if (val.role === 'provider' && !val.serviceCategory) {
+			ctx.addIssue({
+				code: 'custom',
+				message: 'Select a service category',
+				path: ['serviceCategory'],
 			});
 		}
 	});
@@ -104,6 +125,7 @@ function LoginInner() {
 	const navigate = useNavigate();
 	const login = useAuthStore((s) => s.login);
 	const [serverError, setServerError] = useState<string | null>(null);
+	const [showPassword, setShowPassword] = useState(false);
 
 	const {
 		register,
@@ -156,12 +178,31 @@ function LoginInner() {
 
 				<TextField
 					label="Password"
-					type="password"
+					type={showPassword ? 'text' : 'password'}
 					fullWidth
 					margin="normal"
 					{...register('password')}
 					error={!!errors.password}
 					helperText={errors.password?.message}
+					slotProps={{
+						input: {
+							endAdornment: (
+								<InputAdornment position="end">
+									<IconButton
+										aria-label="toggle password visibility"
+										onClick={() => setShowPassword((v) => !v)}
+										edge="end"
+									>
+										{showPassword ? (
+											<VisibilityOffIcon />
+										) : (
+											<VisibilityIcon />
+										)}
+									</IconButton>
+								</InputAdornment>
+							),
+						},
+					}}
 				/>
 
 				<Button
@@ -182,6 +223,7 @@ function RegisterInner() {
 	const navigate = useNavigate();
 	const registerUser = useAuthStore((s) => s.register);
 	const [serverError, setServerError] = useState<string | null>(null);
+	const [showPassword, setShowPassword] = useState(false);
 
 	const {
 		register,
@@ -196,6 +238,7 @@ function RegisterInner() {
 			password: '',
 			role: 'customer',
 			companyName: '',
+			serviceCategory: undefined,
 		},
 	});
 
@@ -212,6 +255,7 @@ function RegisterInner() {
 		};
 		if (data.role === 'provider') {
 			payload.companyName = data.companyName;
+			payload.serviceCategory = data.serviceCategory;
 		}
 		try {
 			await registerUser(data);
@@ -262,12 +306,31 @@ function RegisterInner() {
 
 				<TextField
 					label="Password"
-					type="password"
+					type={showPassword ? 'text' : 'password'}
 					fullWidth
 					margin="normal"
 					{...register('password')}
 					error={!!errors.password}
 					helperText={errors.password?.message}
+					slotProps={{
+						input: {
+							endAdornment: (
+								<InputAdornment position="end">
+									<IconButton
+										aria-label="toggle password visibility"
+										onClick={() => setShowPassword((v) => !v)}
+										edge="end"
+									>
+										{showPassword ? (
+											<VisibilityOffIcon />
+										) : (
+											<VisibilityIcon />
+										)}
+									</IconButton>
+								</InputAdornment>
+							),
+						},
+					}}
 				/>
 
 				<Controller
@@ -291,14 +354,39 @@ function RegisterInner() {
 				/>
 
 				{role === 'provider' && (
-					<TextField
-						label="Company name"
-						fullWidth
-						margin="normal"
-						{...register('companyName')}
-						error={!!errors.companyName}
-						helperText={errors.companyName?.message}
-					/>
+					<>
+						<TextField
+							label="Company name"
+							fullWidth
+							margin="normal"
+							{...register('companyName')}
+							error={!!errors.companyName}
+							helperText={errors.companyName?.message}
+						/>
+
+						<Controller
+							name="serviceCategory"
+							control={control}
+							render={({ field }) => (
+								<TextField
+									select
+									label="Service category"
+									fullWidth
+									margin="normal"
+									value={field.value ?? ''}
+									onChange={field.onChange}
+									error={!!errors.serviceCategory}
+									helperText={errors.serviceCategory?.message}
+								>
+									{SERVICE_CATEGORY_OPTIONS.map((option) => (
+										<MenuItem key={option} value={option}>
+											{option}
+										</MenuItem>
+									))}
+								</TextField>
+							)}
+						/>
+					</>
 				)}
 
 				<Button

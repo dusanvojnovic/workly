@@ -60,7 +60,7 @@ export function CustomerDashboard() {
 		staleTime: 30_000,
 	});
 
-	// gradovi iz podataka (kad se učita)
+	// Cities from data (after load)
 	const cities = React.useMemo(() => {
 		const set = new Set(data.map((x) => x.city).filter(Boolean));
 		return ['all', ...Array.from(set)];
@@ -98,7 +98,7 @@ export function CustomerDashboard() {
 				>
 					<Stack direction="row" spacing={1} alignItems="center">
 						<TuneIcon fontSize="small" />
-						<Typography fontWeight={800}>Filteri</Typography>
+						<Typography fontWeight={800}>Filters</Typography>
 					</Stack>
 
 					<Button
@@ -117,13 +117,15 @@ export function CustomerDashboard() {
 					<TextField
 						value={q}
 						onChange={(e) => setQ(e.target.value)}
-						placeholder="Pretraži (naziv, grad, adresa)…"
-						InputProps={{
-							startAdornment: (
-								<InputAdornment position="start">
-									<SearchIcon fontSize="small" />
-								</InputAdornment>
-							),
+						placeholder="Search (name, city, address)…"
+						slotProps={{
+							input: {
+								startAdornment: (
+									<InputAdornment position="start">
+										<SearchIcon fontSize="small" />
+									</InputAdornment>
+								),
+							},
 						}}
 					/>
 
@@ -132,7 +134,7 @@ export function CustomerDashboard() {
 							variant="body2"
 							sx={{ mb: 0.75, color: 'text.secondary' }}
 						>
-							Kategorija
+							Category
 						</Typography>
 						<Select
 							fullWidth
@@ -143,7 +145,7 @@ export function CustomerDashboard() {
 						>
 							{categories.map((c) => (
 								<MenuItem key={c} value={c}>
-									{c === 'all' ? 'Sve' : c}
+									{c === 'all' ? 'All' : c}
 								</MenuItem>
 							))}
 						</Select>
@@ -154,7 +156,7 @@ export function CustomerDashboard() {
 							variant="body2"
 							sx={{ mb: 0.75, color: 'text.secondary' }}
 						>
-							Grad
+							City
 						</Typography>
 						<Select
 							fullWidth
@@ -163,7 +165,7 @@ export function CustomerDashboard() {
 						>
 							{cities.map((c) => (
 								<MenuItem key={c} value={c}>
-									{c === 'all' ? 'Svi gradovi' : c}
+									{c === 'all' ? 'All cities' : c}
 								</MenuItem>
 							))}
 						</Select>
@@ -176,7 +178,7 @@ export function CustomerDashboard() {
 							variant="body2"
 							sx={{ color: 'text.secondary' }}
 						>
-							Brzi filteri (primer)
+							Quick filters (example)
 						</Typography>
 						<Stack direction="row" flexWrap="wrap" gap={1}>
 							{['Belgrade', 'SPORT'].map((t) => (
@@ -217,18 +219,17 @@ export function CustomerDashboard() {
 					>
 						<Box>
 							<Typography variant="h5" fontWeight={900}>
-								Objekti i usluge
+								Venues and services
 							</Typography>
 							<Typography variant="body2" color="text.secondary">
-								Izaberi objekat, pogledaj ponude i rezerviši
-								termin.
+								Choose a venue, view offerings, and book a slot.
 							</Typography>
 						</Box>
 
 						<Stack direction="row" spacing={1}>
-							<Button variant="outlined">Mapa (kasnije)</Button>
+							<Button variant="outlined">Map (soon)</Button>
 							<Button variant="contained">
-								Moje rezervacije
+								My bookings
 							</Button>
 						</Stack>
 					</Stack>
@@ -241,11 +242,11 @@ export function CustomerDashboard() {
 					sx={{ mb: 1.5 }}
 				>
 					<Typography variant="body2" color="text.secondary">
-						Prikazano: <b>{isLoading ? '...' : data.length}</b>
+						Showing: <b>{isLoading ? '...' : data.length}</b>
 					</Typography>
 					{isError && (
 						<Typography variant="body2" color="error">
-							Greška pri učitavanju.
+							Failed to load.
 						</Typography>
 					)}
 				</Stack>
@@ -297,7 +298,7 @@ function VenueCardItem({ v }: { v: VenueCard }) {
 				'&:hover': { transform: 'translateY(-2px)' },
 			}}
 		>
-			{/* “Hero” header (bez slika za sad) */}
+			{/* “Hero” header (no images yet) */}
 			<Box
 				sx={{
 					height: 140,
@@ -333,15 +334,15 @@ function VenueCardItem({ v }: { v: VenueCard }) {
 						variant="outlined"
 					/>
 					<Chip
-						label={`${v.offeringsCount} ponuda`}
+						label={`${v.offeringsCount} offerings`}
 						size="small"
 						variant="outlined"
 					/>
 					<Chip
 						label={
 							v.priceFrom == null
-								? 'Nema cene'
-								: `Od ${formatEur(v.priceFrom)}`
+								? 'No price'
+								: `From ${formatEur(v.priceFrom)}`
 						}
 						size="small"
 						color={v.priceFrom == null ? 'default' : 'primary'}
@@ -359,7 +360,7 @@ function VenueCardItem({ v }: { v: VenueCard }) {
 					<Typography fontWeight={900}>
 						{v.priceFrom == null
 							? '—'
-							: `${formatEur(v.priceFrom)} / termin`}
+							: `${formatEur(v.priceFrom)} / slot`}
 					</Typography>
 
 					{/* <Button
@@ -368,7 +369,7 @@ function VenueCardItem({ v }: { v: VenueCard }) {
 						params={{ venueId: v.id }}
 						variant="contained"
 					>
-						Detalji
+						Details
 					</Button> */}
 				</Stack>
 			</Box>

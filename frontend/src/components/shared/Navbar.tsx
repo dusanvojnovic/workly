@@ -1,10 +1,15 @@
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
-import { AppBar, IconButton, Toolbar, Typography } from '@mui/material';
+import { AppBar, Button, IconButton, Toolbar, Typography } from '@mui/material';
+import { useNavigate } from '@tanstack/react-router';
+import { useAuthStore } from '../../store/auth.store';
 import { useThemeMode } from '../../theme/mode';
 
 export const Navbar = () => {
 	const { mode, toggleMode } = useThemeMode();
+	const token = useAuthStore((s) => s.token);
+	const logout = useAuthStore((s) => s.logout);
+	const navigate = useNavigate();
 
 	return (
 		<AppBar
@@ -23,13 +28,27 @@ export const Navbar = () => {
 					BookMe
 				</Typography>
 
-				<IconButton
-					onClick={toggleMode}
-					color="inherit"
-					aria-label="toggle theme"
-				>
-					{mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
-				</IconButton>
+				<Toolbar sx={{ gap: 1, minHeight: 'unset', p: 0 }}>
+					{token && (
+						<Button
+							color="inherit"
+							onClick={() => {
+								logout();
+								navigate({ to: '/login' });
+							}}
+						>
+							Logout
+						</Button>
+					)}
+
+					<IconButton
+						onClick={toggleMode}
+						color="inherit"
+						aria-label="toggle theme"
+					>
+						{mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
+					</IconButton>
+				</Toolbar>
 			</Toolbar>
 		</AppBar>
 	);
