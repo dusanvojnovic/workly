@@ -1,4 +1,3 @@
-import { Typography } from '@mui/material';
 import {
 	createRootRoute,
 	createRoute,
@@ -7,6 +6,7 @@ import {
 	redirect,
 } from '@tanstack/react-router';
 import { AppLayout } from '../layout/AppLayout';
+import { DashboardPage } from '../pages/DashboardPage';
 import { LoginPage } from '../pages/LoginPage';
 import { RegisterPage } from '../pages/RegisterPage';
 import { useAuthStore } from '../store/auth.store';
@@ -40,7 +40,7 @@ const protectedRoute = createRoute({
 const dashboardRoute = createRoute({
 	getParentRoute: () => protectedRoute,
 	path: '/dashboard',
-	component: () => <Typography>DASHBOARD</Typography>,
+	component: DashboardPage,
 });
 
 const routeTree = rootRoute.addChildren([
