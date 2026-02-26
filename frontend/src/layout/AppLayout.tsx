@@ -20,7 +20,7 @@ export function AppLayout() {
 				flexDirection: 'column',
 				background: (theme) =>
 					theme.palette.mode === 'dark'
-						? 'linear-gradient(180deg, #0b0f19 0%, #0e1525 100%)' // ✅ fali ti )
+						? 'linear-gradient(180deg, #0b0f19 0%, #0e1525 100%)'
 						: '#f8fafc',
 			}}
 		>
@@ -36,7 +36,7 @@ export function AppLayout() {
 					px: 2,
 				}}
 			>
-				<Container maxWidth="sm" sx={{ width: '100%' }}>
+				<Container sx={{ width: '100%' }}>
 					<Box sx={{ display: 'flex', justifyContent: 'center' }}>
 						<Outlet />
 					</Box>

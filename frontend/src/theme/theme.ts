@@ -79,6 +79,11 @@ export const lightTheme = createTheme({
 				size: 'small',
 			},
 		},
+		MuiSelect: {
+			defaultProps: {
+				size: 'small',
+			},
+		},
 		MuiPaper: {
 			styleOverrides: {
 				root: {
@@ -163,6 +168,11 @@ export const darkTheme = createTheme({
 	},
 	components: {
 		MuiTextField: {
+			defaultProps: {
+				size: 'small',
+			},
+		},
+		MuiSelect: {
 			defaultProps: {
 				size: 'small',
 			},
