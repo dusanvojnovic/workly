@@ -15,6 +15,15 @@ const rootRoute = createRootRoute({
 	component: () => <AppLayout />,
 });
 
+const indexRoute = createRoute({
+	getParentRoute: () => rootRoute,
+	path: '/',
+	beforeLoad: () => {
+		const token = useAuthStore.getState().token;
+		throw redirect({ to: token ? '/dashboard' : '/login' });
+	},
+});
+
 const loginRoute = createRoute({
 	getParentRoute: () => rootRoute,
 	path: '/login',
@@ -44,6 +53,7 @@ const dashboardRoute = createRoute({
 });
 
 const routeTree = rootRoute.addChildren([
+	indexRoute,
 	loginRoute,
 	registerRoute,
 	protectedRoute.addChildren([dashboardRoute]),
