@@ -1,8 +1,10 @@
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import {
 	Alert,
 	Box,
 	Button,
+	Snackbar,
 	Divider,
 	MenuItem,
 	Paper,
@@ -13,37 +15,14 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { TimePicker } from '@mui/x-date-pickers/TimePicker';
+import dayjs, { type Dayjs } from 'dayjs';
 import * as React from 'react';
 import { api } from '../api/api';
 import { useAuthStore } from '../store/auth.store';
-
-type Unit = {
-	id: string;
-	name: string;
-	unitType: string;
-	capacity?: number | null;
-};
-
-type Offering = {
-	id: string;
-	name: string;
-	durationMin: number;
-	price?: number | null;
-	bufferMin?: number | null;
-	isActive: boolean;
-};
-
-type VenueDetails = {
-	id: string;
-	providerId: string;
-	category: string;
-	name: string;
-	description?: string | null;
-	city: string;
-	address?: string | null;
-	units: Unit[];
-	offerings: Offering[];
-};
+import { type Unit, type VenueDetails } from '../types/venue';
 
 type UpdateVenuePayload = {
 	category?: string;
@@ -51,6 +30,18 @@ type UpdateVenuePayload = {
 	city?: string;
 	description?: string;
 	address?: string;
+};
+
+type CreateUnitPayload = {
+	name: string;
+	unitType: string;
+	capacity?: number;
+};
+
+type ScheduleEntryPayload = {
+	dayOfWeek: number;
+	startTime: string;
+	endTime: string;
 };
 
 const CATEGORY_OPTIONS = [
@@ -74,6 +65,32 @@ async function updateVenue(
 	const res = await api.patch<VenueDetails>(
 		`/provider/venues/${venueId}`,
 		payload,
+		{
+			headers: { Authorization: `Bearer ${token}` },
+		},
+	);
+	return res.data;
+}
+
+async function createUnit(
+	token: string,
+	venueId: string,
+	payload: CreateUnitPayload,
+) {
+	const res = await api.post<Unit>(`/provider/venues/${venueId}/units`, payload, {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+	return res.data;
+}
+
+async function updateSchedule(
+	token: string,
+	venueId: string,
+	entries: ScheduleEntryPayload[],
+) {
+	const res = await api.patch(
+		`/provider/venues/${venueId}/schedule`,
+		{ entries },
 		{
 			headers: { Authorization: `Bearer ${token}` },
 		},
@@ -106,6 +123,28 @@ export function VenueDetailsPage() {
 		category: '',
 	});
 
+	const [unitForm, setUnitForm] = React.useState({
+		name: '',
+		unitType: '',
+		capacity: '',
+	});
+
+	const [repeatType, setRepeatType] = React.useState<
+		'everyday' | 'weekdays' | 'weekends' | 'custom'
+	>('everyday');
+	const [selectedDays, setSelectedDays] = React.useState<number[]>([
+		0, 1, 2, 3, 4, 5, 6,
+	]);
+	const [scheduleStart, setScheduleStart] = React.useState<Dayjs | null>(
+		dayjs('09:00', 'HH:mm'),
+	);
+	const [scheduleEnd, setScheduleEnd] = React.useState<Dayjs | null>(
+		dayjs('21:00', 'HH:mm'),
+	);
+	const [scheduleEntries, setScheduleEntries] = React.useState<
+		ScheduleEntryPayload[]
+	>([]);
+
 	React.useEffect(() => {
 		if (!venue) return;
 		setForm({
@@ -115,6 +154,20 @@ export function VenueDetailsPage() {
 			description: venue.description ?? '',
 			category: venue.category,
 		});
+
+		if (venue.schedules?.length) {
+			setScheduleEntries(
+				venue.schedules.map((entry) => ({
+					dayOfWeek: entry.dayOfWeek,
+					startTime: entry.startTime,
+					endTime: entry.endTime,
+				})),
+			);
+			setScheduleStart(dayjs(venue.schedules[0].startTime, 'HH:mm'));
+			setScheduleEnd(dayjs(venue.schedules[0].endTime, 'HH:mm'));
+		} else {
+			setScheduleEntries([]);
+		}
 	}, [venue]);
 
 	const isOwner =
@@ -123,6 +176,23 @@ export function VenueDetailsPage() {
 	const updateMutation = useMutation({
 		mutationFn: (payload: UpdateVenuePayload) =>
 			updateVenue(token!, venueId, payload),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['venue', venueId] });
+		},
+	});
+
+	const createUnitMutation = useMutation({
+		mutationFn: (payload: CreateUnitPayload) =>
+			createUnit(token!, venueId, payload),
+		onSuccess: () => {
+			setUnitForm({ name: '', unitType: '', capacity: '' });
+			queryClient.invalidateQueries({ queryKey: ['venue', venueId] });
+		},
+	});
+
+	const updateScheduleMutation = useMutation({
+		mutationFn: (entries: ScheduleEntryPayload[]) =>
+			updateSchedule(token!, venueId, entries),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['venue', venueId] });
 		},
@@ -151,8 +221,31 @@ export function VenueDetailsPage() {
 		form.city?.trim() &&
 		form.category?.trim();
 
+	const canAddUnit =
+		isOwner && unitForm.name.trim() && unitForm.unitType.trim();
+
+	const canAddScheduleEntry =
+		isOwner && !!scheduleStart && !!scheduleEnd && selectedDays.length > 0;
+
+	const canSaveSchedule = isOwner && scheduleEntries.length > 0;
+
 	return (
 		<Box sx={{ width: '100%', maxWidth: 1200 }}>
+			<Snackbar
+				open={updateScheduleMutation.isSuccess}
+				autoHideDuration={2500}
+				onClose={() => updateScheduleMutation.reset()}
+				anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+			>
+				<Alert
+					severity="success"
+					icon={<CheckCircleIcon />}
+					onClose={() => updateScheduleMutation.reset()}
+					sx={{ alignItems: 'center' }}
+				>
+					Schedule saved successfully
+				</Alert>
+			</Snackbar>
 			<Paper variant="outlined" sx={{ p: 2, borderRadius: 3, mb: 2 }}>
 				<Stack
 					direction={{ xs: 'column', md: 'row' }}
@@ -303,6 +396,196 @@ export function VenueDetailsPage() {
 				</Paper>
 
 				<Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+					<Stack spacing={2}>
+						<Typography fontWeight={800}>Opening hours</Typography>
+
+						{isOwner ? (
+							<>
+								<Stack
+									direction={{ xs: 'column', md: 'row' }}
+									spacing={1.5}
+									alignItems={{ md: 'center' }}
+								>
+									<TextField
+										select
+										label="Repeat"
+										value={repeatType}
+										onChange={(e) => {
+											const value = String(e.target.value) as
+												| 'everyday'
+												| 'weekdays'
+												| 'weekends'
+												| 'custom';
+											setRepeatType(value);
+											if (value === 'everyday')
+												setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
+											if (value === 'weekdays')
+												setSelectedDays([1, 2, 3, 4, 5]);
+											if (value === 'weekends')
+												setSelectedDays([0, 6]);
+										}}
+										size="small"
+										sx={{ minWidth: 180 }}
+									>
+										<MenuItem value="everyday">Every day</MenuItem>
+										<MenuItem value="weekdays">Weekdays</MenuItem>
+										<MenuItem value="weekends">Weekends</MenuItem>
+										<MenuItem value="custom">Custom</MenuItem>
+									</TextField>
+
+									<LocalizationProvider dateAdapter={AdapterDayjs}>
+										<TimePicker
+											label="Start"
+											ampm={false}
+											value={scheduleStart}
+											onChange={(value) => setScheduleStart(value)}
+											slotProps={{
+												textField: {
+													size: 'small',
+													sx: { width: 140 },
+												},
+											}}
+										/>
+										<TimePicker
+											label="End"
+											ampm={false}
+											value={scheduleEnd}
+											onChange={(value) => setScheduleEnd(value)}
+											slotProps={{
+												textField: {
+													size: 'small',
+													sx: { width: 140 },
+												},
+											}}
+										/>
+									</LocalizationProvider>
+									<Button
+										variant="contained"
+										disabled={!canAddScheduleEntry}
+										size="small"
+										onClick={() => {
+											const newEntries = selectedDays.map((day) => ({
+												dayOfWeek: day,
+												startTime: scheduleStart!.format('HH:mm'),
+												endTime: scheduleEnd!.format('HH:mm'),
+											}));
+											setScheduleEntries((prev) => {
+												const filtered = prev.filter(
+													(entry) =>
+														!selectedDays.includes(entry.dayOfWeek),
+												);
+												return [...filtered, ...newEntries];
+											});
+										}}
+									>
+										Add working hours
+									</Button>
+								</Stack>
+
+								{repeatType === 'custom' && (
+									<Stack direction="row" spacing={1} flexWrap="wrap">
+										{[
+											{ label: 'Sun', value: 0 },
+											{ label: 'Mon', value: 1 },
+											{ label: 'Tue', value: 2 },
+											{ label: 'Wed', value: 3 },
+											{ label: 'Thu', value: 4 },
+											{ label: 'Fri', value: 5 },
+											{ label: 'Sat', value: 6 },
+										].map((day) => (
+											<Button
+												key={day.value}
+												variant={
+													selectedDays.includes(day.value)
+														? 'contained'
+														: 'outlined'
+												}
+												size="small"
+												onClick={() => {
+													setSelectedDays((prev) =>
+														prev.includes(day.value)
+															? prev.filter((d) => d !== day.value)
+															: [...prev, day.value],
+													);
+												}}
+											>
+												{day.label}
+											</Button>
+										))}
+									</Stack>
+								)}
+
+								<Divider />
+							</>
+						) : null}
+
+						{scheduleEntries.length ? (
+							<Stack spacing={1}>
+								{scheduleEntries
+									.slice()
+									.sort((a, b) => {
+										const order = [1, 2, 3, 4, 5, 6, 0];
+										const dayDiff =
+											order.indexOf(a.dayOfWeek) - order.indexOf(b.dayOfWeek);
+										if (dayDiff !== 0) return dayDiff;
+										return a.startTime.localeCompare(b.startTime);
+									})
+									.map((entry, idx) => (
+									<Stack
+										key={`${entry.dayOfWeek}-${entry.startTime}-${idx}`}
+										direction="row"
+										justifyContent="space-between"
+										alignItems="center"
+										spacing={1}
+									>
+										<Typography variant="body2">
+											{formatDay(entry.dayOfWeek)}: {entry.startTime} -{' '}
+											{entry.endTime}
+										</Typography>
+										{isOwner && (
+											<Button
+												size="small"
+												onClick={() =>
+													setScheduleEntries((prev) =>
+														prev.filter((_, i) => i !== idx),
+													)
+												}
+											>
+												Remove
+											</Button>
+										)}
+									</Stack>
+								))}
+							</Stack>
+						) : (
+							<Typography variant="body2" color="text.secondary">
+								{isOwner
+									? 'Add working hours.'
+									: 'No schedule set yet.'}
+							</Typography>
+						)}
+
+						{isOwner && (
+							<Stack direction="row" spacing={1} alignItems="center">
+								<Button
+									variant="contained"
+									disabled={!canSaveSchedule || updateScheduleMutation.isPending}
+									onClick={() => updateScheduleMutation.mutate(scheduleEntries)}
+								>
+									Save schedule
+								</Button>
+
+								{updateScheduleMutation.isError && (
+									<Typography variant="body2" color="error">
+										Failed to save schedule.
+									</Typography>
+								)}
+							</Stack>
+						)}
+					</Stack>
+				</Paper>
+
+				<Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
 					<Stack
 						direction={{ xs: 'column', md: 'row' }}
 						justifyContent="space-between"
@@ -316,6 +599,79 @@ export function VenueDetailsPage() {
 					</Stack>
 
 					<Divider sx={{ my: 2 }} />
+
+					{isOwner && (
+						<Stack spacing={2} sx={{ mb: 2 }}>
+							<Typography fontWeight={700}>Add unit</Typography>
+							<Stack
+								direction={{ xs: 'column', md: 'row' }}
+								spacing={2}
+							>
+								<TextField
+									label="Name"
+									value={unitForm.name}
+									onChange={(e) =>
+										setUnitForm((prev) => ({
+											...prev,
+											name: e.target.value,
+										}))
+									}
+									fullWidth
+								/>
+								<TextField
+									label="Type"
+									value={unitForm.unitType}
+									onChange={(e) =>
+										setUnitForm((prev) => ({
+											...prev,
+											unitType: e.target.value,
+										}))
+									}
+									fullWidth
+								/>
+								<TextField
+									label="Capacity"
+									type="number"
+									value={unitForm.capacity}
+									onChange={(e) =>
+										setUnitForm((prev) => ({
+											...prev,
+											capacity: e.target.value,
+										}))
+									}
+									fullWidth
+								/>
+							</Stack>
+							<Stack direction="row" spacing={1} alignItems="center">
+								<Button
+									variant="contained"
+									disabled={!canAddUnit || createUnitMutation.isPending}
+									onClick={() => {
+										const capacity = unitForm.capacity.trim()
+											? Number(unitForm.capacity)
+											: undefined;
+
+										createUnitMutation.mutate({
+											name: unitForm.name.trim(),
+											unitType: unitForm.unitType.trim(),
+											capacity: Number.isNaN(capacity)
+												? undefined
+												: capacity,
+										});
+									}}
+								>
+									Add unit
+								</Button>
+
+								{createUnitMutation.isError && (
+									<Typography variant="body2" color="error">
+										Failed to add unit. Try again.
+									</Typography>
+								)}
+							</Stack>
+							<Divider />
+						</Stack>
+					)}
 
 					{venue.units.length === 0 ? (
 						<Typography variant="body2" color="text.secondary">
@@ -400,4 +756,9 @@ export function VenueDetailsPage() {
 			</Stack>
 		</Box>
 	);
+}
+
+function formatDay(day: number) {
+	const map = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+	return map[day] ?? String(day);
 }
