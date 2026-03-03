@@ -18,7 +18,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import * as React from 'react';
 import { api } from '../../api/api';
-import { type VenueCard, VenueCardItem } from '../venues/VenueCardItem';
+import { VenueCardItem } from '../venues/VenueCardItem';
+import { type VenueCard } from '../../types/venue';
 
 async function fetchVenues(params: {
 	q: string;

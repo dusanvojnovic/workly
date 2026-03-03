@@ -9,16 +9,7 @@ import {
 	Typography,
 } from '@mui/material';
 
-export type VenueCard = {
-	id: string;
-	name: string;
-	category: string;
-	city: string;
-	address: string;
-	unitsCount: number;
-	offeringsCount: number;
-	priceFrom: number | null;
-};
+import { type VenueCard } from '../../types/venue';
 
 export function VenueCardItem({
 	v,
