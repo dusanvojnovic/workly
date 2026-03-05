@@ -270,6 +270,7 @@ export function VenueDetailsPage() {
 	const [selectedOfferingId, setSelectedOfferingId] = React.useState('');
 	const [selectedDate, setSelectedDate] = React.useState<Dayjs | null>(null);
 	const [selectedSlot, setSelectedSlot] = React.useState<string | null>(null);
+	const [bookingDialogOpen, setBookingDialogOpen] = React.useState(false);
 	const [requestedSlot, setRequestedSlot] = React.useState<{
 		slot: string;
 		date: string;
@@ -510,6 +511,7 @@ export function VenueDetailsPage() {
 	const offerings = venue?.offerings ?? [];
 	const activeOfferings = offerings.filter((offering) => offering.isActive);
 	const schedules = venue?.schedules ?? [];
+	const displaySchedules = isOwner ? scheduleEntries : schedules;
 	const selectedUnit = units.find((u) => u.id === selectedUnitId);
 	const selectedOffering = activeOfferings.find(
 		(o) => o.id === selectedOfferingId,
@@ -854,86 +856,102 @@ export function VenueDetailsPage() {
 				</Paper>
 
 				{!isOwner && (
-					<Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
-						<Stack spacing={2}>
-							<Typography fontWeight={800}>Book a slot</Typography>
-
-							<Stack
-								direction={{ xs: 'column', md: 'row' }}
-								spacing={1.5}
-								alignItems={{ md: 'center' }}
-							>
-								<TextField
-									select
-									label="Unit"
-									value={selectedUnitId}
-									onChange={(e) =>
-										setSelectedUnitId(String(e.target.value))
-									}
-									size="small"
-									sx={{ minWidth: 200 }}
+					<Dialog
+						open={bookingDialogOpen}
+						onClose={() => setBookingDialogOpen(false)}
+						fullWidth
+						maxWidth="md"
+					>
+						<DialogTitle>Reserve a slot</DialogTitle>
+						<DialogContent sx={{ pt: 2 }}>
+							<Stack spacing={2}>
+								<Stack
+									direction={{ xs: 'column', md: 'row' }}
+									spacing={1.5}
+									alignItems={{ md: 'center' }}
 								>
-									{venue.units.map((unit) => (
-										<MenuItem key={unit.id} value={unit.id}>
-											{unit.name}
-										</MenuItem>
-									))}
-								</TextField>
+									{selectedUnitId && selectedUnit ? (
+										<Box sx={{ minWidth: 200 }}>
+											<Typography variant="caption" color="text.secondary">
+												Unit
+											</Typography>
+											<Typography fontWeight={700}>
+												{selectedUnit.name}
+											</Typography>
+										</Box>
+									) : (
+										<TextField
+											select
+											label="Unit"
+											value={selectedUnitId}
+											onChange={(e) =>
+												setSelectedUnitId(String(e.target.value))
+											}
+											size="small"
+											sx={{ minWidth: 200 }}
+										>
+											{venue.units.map((unit) => (
+												<MenuItem key={unit.id} value={unit.id}>
+													{unit.name}
+												</MenuItem>
+											))}
+										</TextField>
+									)}
 
-								<TextField
-									select
-									label="Duration"
-									value={selectedOfferingId}
-									onChange={(e) =>
-										setSelectedOfferingId(String(e.target.value))
-									}
-									size="small"
-									sx={{ minWidth: 220 }}
-								>
-									{activeOfferings.map((offering) => (
-										<MenuItem key={offering.id} value={offering.id}>
-											{offering.name} ({offering.durationMin} min)
-										</MenuItem>
-									))}
-								</TextField>
+									<TextField
+										select
+										label="Duration"
+										value={selectedOfferingId}
+										onChange={(e) =>
+											setSelectedOfferingId(String(e.target.value))
+										}
+										size="small"
+										sx={{ minWidth: 220 }}
+									>
+										{activeOfferings.map((offering) => (
+											<MenuItem key={offering.id} value={offering.id}>
+												{offering.name} ({offering.durationMin} min)
+											</MenuItem>
+										))}
+									</TextField>
 
-								<LocalizationProvider dateAdapter={AdapterDayjs}>
-									<DatePicker
-										label="Date"
-										value={selectedDate}
-										onChange={(value) => setSelectedDate(value)}
-										slotProps={{
-											textField: { size: 'small', sx: { minWidth: 180 } },
-										}}
-									/>
-								</LocalizationProvider>
-							</Stack>
+									<LocalizationProvider dateAdapter={AdapterDayjs}>
+										<DatePicker
+											label="Date"
+											value={selectedDate}
+											onChange={(value) => setSelectedDate(value)}
+											slotProps={{
+												textField: { size: 'small', sx: { minWidth: 180 } },
+											}}
+										/>
+									</LocalizationProvider>
+								</Stack>
 
-							{!venue.offerings.length ? (
-								<Typography variant="body2" color="text.secondary">
-									No offerings yet.
-								</Typography>
-							) : !selectedDate ? (
-								<Typography variant="body2" color="text.secondary">
-									Select a date to see available slots.
-								</Typography>
-							) : !selectedUnitId ? (
-								<Typography variant="body2" color="text.secondary">
-									Select a unit to see available slots.
-								</Typography>
-							) : !selectedOfferingId ? (
-								<Typography variant="body2" color="text.secondary">
-									Select a duration to see available slots.
-								</Typography>
-							) : !daySchedule.length ? (
-								<Typography variant="body2" color="text.secondary">
-									No working hours for this day.
-								</Typography>
-							) : (
-								<Stack spacing={1}>
+								{!venue.offerings.length ? (
 									<Typography variant="body2" color="text.secondary">
-										Time slots ({slotStepMin} min step)
+										No offerings yet.
 									</Typography>
+								) : !selectedDate ? (
+									<Typography variant="body2" color="text.secondary">
+										Select a date to see available slots.
+									</Typography>
+								) : !selectedUnitId ? (
+									<Typography variant="body2" color="text.secondary">
+										Select a unit to see available slots.
+									</Typography>
+								) : !selectedOfferingId ? (
+									<Typography variant="body2" color="text.secondary">
+										Select a duration to see available slots.
+									</Typography>
+								) : !daySchedule.length ? (
+									<Typography variant="body2" color="text.secondary">
+										No working hours for this day.
+									</Typography>
+								) : (
+									<Stack spacing={1}>
+										<Typography variant="body2" color="text.secondary">
+											Time slots ({slotStepMin} min step)
+										</Typography>
 										{allSlots.length === 0 ? (
 											<Typography
 												variant="body2"
@@ -1080,36 +1098,37 @@ export function VenueDetailsPage() {
 												);
 											})()
 										)}
-									{selectedSlot && (
-										<Box sx={{ display: 'flex', justifyContent: 'center' }}>
-											<Button
-												variant="contained"
-												disabled={createBookingMutation.isPending}
-												onClick={() => {
-													if (!token) {
-														setBookingToast({
-															message: 'Please log in to book a slot',
-															severity: 'error',
-														});
-														return;
-													}
-													if (!selectedDate || !selectedSlot) return;
+										{selectedSlot && (
+											<Box sx={{ display: 'flex', justifyContent: 'center' }}>
+												<Button
+													variant="contained"
+													disabled={createBookingMutation.isPending}
+													onClick={() => {
+														if (!token) {
+															setBookingToast({
+																message: 'Please log in to book a slot',
+																severity: 'error',
+															});
+															return;
+														}
+														if (!selectedDate || !selectedSlot) return;
 
-													createBookingMutation.mutate({
-														unitId: selectedUnitId,
-														offeringId: selectedOfferingId,
-														startAt: `${dateParam}T${selectedSlot}:00`,
-													});
-												}}
-											>
-												Reserve slot
-											</Button>
-										</Box>
-									)}
-								</Stack>
-							)}
-						</Stack>
-					</Paper>
+														createBookingMutation.mutate({
+															unitId: selectedUnitId,
+															offeringId: selectedOfferingId,
+															startAt: `${dateParam}T${selectedSlot}:00`,
+														});
+													}}
+												>
+													Reserve slot
+												</Button>
+											</Box>
+										)}
+									</Stack>
+								)}
+							</Stack>
+						</DialogContent>
+					</Dialog>
 				)}
 
 				<Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
@@ -1236,9 +1255,9 @@ export function VenueDetailsPage() {
 							</>
 						) : null}
 
-						{scheduleEntries.length ? (
+						{displaySchedules.length ? (
 							<Stack spacing={1}>
-								{scheduleEntries
+								{displaySchedules
 									.slice()
 									.sort((a, b) => {
 										const order = [1, 2, 3, 4, 5, 6, 0];
@@ -1694,6 +1713,18 @@ export function VenueDetailsPage() {
 													}}
 												>
 													Delete
+												</Button>
+											)}
+											{!isOwner && (
+												<Button
+													size="small"
+													variant="contained"
+													onClick={() => {
+														setSelectedUnitId(unit.id);
+														setBookingDialogOpen(true);
+													}}
+												>
+													Reserve
 												</Button>
 											)}
 										</Stack>
