@@ -59,6 +59,12 @@ type CreateOfferingPayload = {
 
 type UpdateOfferingPayload = Partial<CreateOfferingPayload>;
 
+type CreateBookingPayload = {
+	unitId: string;
+	offeringId: string;
+	startAt: string;
+};
+
 type ScheduleEntryPayload = {
 	dayOfWeek: number;
 	startTime: string;
@@ -197,6 +203,17 @@ async function fetchBookings(venueId: string, date: string) {
 	return res.data;
 }
 
+async function createBooking(
+	token: string,
+	venueId: string,
+	payload: CreateBookingPayload,
+) {
+	const res = await api.post(`/venues/${venueId}/bookings`, payload, {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+	return res.data;
+}
+
 export function VenueDetailsPage() {
 	const { venueId } = useParams({ from: '/venues/$venueId' });
 	const navigate = useNavigate();
@@ -251,9 +268,14 @@ export function VenueDetailsPage() {
 
 	const [selectedUnitId, setSelectedUnitId] = React.useState('');
 	const [selectedOfferingId, setSelectedOfferingId] = React.useState('');
-	const [selectedDate, setSelectedDate] = React.useState<Dayjs | null>(
-		dayjs(),
-	);
+	const [selectedDate, setSelectedDate] = React.useState<Dayjs | null>(null);
+	const [selectedSlot, setSelectedSlot] = React.useState<string | null>(null);
+	const [requestedSlot, setRequestedSlot] = React.useState<{
+		slot: string;
+		date: string;
+		unitId: string;
+		offeringId: string;
+	} | null>(null);
 	const [editingUnitId, setEditingUnitId] = React.useState<string | null>(
 		null,
 	);
@@ -290,6 +312,10 @@ export function VenueDetailsPage() {
 	const [deleteOfferingId, setDeleteOfferingId] = React.useState<
 		string | null
 	>(null);
+	const [bookingToast, setBookingToast] = React.useState<{
+		message: string;
+		severity: 'success' | 'error';
+	} | null>(null);
 
 	React.useEffect(() => {
 		if (!venue) return;
@@ -418,6 +444,35 @@ export function VenueDetailsPage() {
 		},
 	});
 
+	const createBookingMutation = useMutation({
+		mutationFn: (payload: CreateBookingPayload) =>
+			createBooking(token!, venueId, payload),
+		onSuccess: () => {
+			if (selectedSlot) {
+				setRequestedSlot({
+					slot: selectedSlot,
+					date: dateParam,
+					unitId: selectedUnitId,
+					offeringId: selectedOfferingId,
+				});
+			}
+			setSelectedSlot(null);
+			queryClient.invalidateQueries({
+				queryKey: ['venue-bookings', venueId, dateParam],
+			});
+			setBookingToast({
+				message: 'Uspesno ste rezervisali termin.',
+				severity: 'success',
+			});
+			navigate({ to: '/my-bookings' });
+		},
+		onError: (error) => {
+			const message =
+				error instanceof Error ? error.message : 'Failed to create booking';
+			setBookingToast({ message, severity: 'error' });
+		},
+	});
+
 	const updateScheduleMutation = useMutation({
 		mutationFn: (entries: ScheduleEntryPayload[]) =>
 			updateSchedule(token!, venueId, entries),
@@ -469,24 +524,20 @@ export function VenueDetailsPage() {
 	const bookingsForUnit = bookings.filter(
 		(booking) => booking.unitId === selectedUnitId,
 	);
-	const availableSlots = React.useMemo(() => {
+	const allSlots = React.useMemo(() => {
 		if (!durationMin || !selectedDate || !selectedUnitId) return [];
-		return generateAvailableSlots(
-			daySchedule,
-			slotStepMin,
-			durationMin,
-			bookingsForUnit,
-			dateParam,
-		);
+		return generateSlots(daySchedule, slotStepMin, durationMin);
 	}, [
 		daySchedule,
 		slotStepMin,
 		durationMin,
-		bookingsForUnit,
-		dateParam,
 		selectedDate,
 		selectedUnitId,
 	]);
+
+	React.useEffect(() => {
+		setSelectedSlot(null);
+	}, [selectedUnitId, selectedOfferingId, selectedDate]);
 
 	if (isLoading) {
 		return (
@@ -551,6 +602,22 @@ export function VenueDetailsPage() {
 						sx={{ alignItems: 'center' }}
 					>
 						{offeringToast.message}
+					</Alert>
+				</Snackbar>
+			)}
+			{bookingToast && (
+				<Snackbar
+					open
+					autoHideDuration={2500}
+					onClose={() => setBookingToast(null)}
+					anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+				>
+					<Alert
+						severity={bookingToast.severity}
+						onClose={() => setBookingToast(null)}
+						sx={{ alignItems: 'center' }}
+					>
+						{bookingToast.message}
 					</Alert>
 				</Snackbar>
 			)}
@@ -846,6 +913,10 @@ export function VenueDetailsPage() {
 								<Typography variant="body2" color="text.secondary">
 									No offerings yet.
 								</Typography>
+							) : !selectedDate ? (
+								<Typography variant="body2" color="text.secondary">
+									Select a date to see available slots.
+								</Typography>
 							) : !selectedUnitId ? (
 								<Typography variant="body2" color="text.secondary">
 									Select a unit to see available slots.
@@ -861,34 +932,180 @@ export function VenueDetailsPage() {
 							) : (
 								<Stack spacing={1}>
 									<Typography variant="body2" color="text.secondary">
-										Available slots ({slotStepMin} min step)
+										Time slots ({slotStepMin} min step)
 									</Typography>
-									<Box
-										sx={{
-											display: 'flex',
-											flexWrap: 'wrap',
-											gap: 1,
-										}}
-									>
-										{availableSlots.length === 0 ? (
+										{allSlots.length === 0 ? (
 											<Typography
 												variant="body2"
 												color="text.secondary"
 											>
-												No available slots.
+												No slots for this day.
 											</Typography>
 										) : (
-											availableSlots.map((slot) => (
-												<Chip
-													key={slot}
-													label={slot}
-													size="small"
-													color="success"
-													variant="filled"
-												/>
-											))
+											(() => {
+												const duration = durationMin ?? 0;
+												const mid = Math.ceil(allSlots.length / 2);
+												const left = allSlots.slice(0, mid);
+												const right = allSlots.slice(mid);
+
+												return (
+													<Stack
+														direction={{ xs: 'column', sm: 'row' }}
+														spacing={2}
+														alignItems="flex-start"
+													>
+														<Stack spacing={1}>
+															{left.map((slot) => {
+																const label = `${slot}–${fromMinutes(
+																	toMinutes(slot) + duration,
+																)}`;
+																const isSelected = selectedSlot === slot;
+																const isRequested =
+																	requestedSlot?.slot === slot &&
+																	requestedSlot.date === dateParam &&
+																	requestedSlot.unitId === selectedUnitId &&
+																	requestedSlot.offeringId === selectedOfferingId;
+																const isBusy = isSlotBooked(
+																	bookingsForUnit,
+																	dateParam,
+																	slot,
+																	duration,
+																);
+
+																return (
+																	<Chip
+																		key={slot}
+																		label={label}
+																		size="medium"
+																		color={isBusy ? 'default' : 'success'}
+																		variant={
+																			isSelected
+																				? 'filled'
+																				: isBusy
+																					? 'outlined'
+																					: 'outlined'
+																		}
+																		onClick={() => {
+																			if (isRequested || isBusy) return;
+																			setSelectedSlot(slot);
+																		}}
+																		sx={{
+																			maxWidth: 200,
+																			px: 1.5,
+																			py: 1.2,
+																			backgroundColor: isRequested
+																				? 'rgba(255, 193, 7, 0.18)'
+																				: isSelected
+																					? 'rgba(76, 175, 80, 0.9)'
+																					: isBusy
+																						? 'rgba(158, 158, 158, 0.15)'
+																						: 'rgba(76, 175, 80, 0.08)',
+																			color: isSelected
+																				? 'common.white'
+																				: isRequested
+																					? 'warning.main'
+																					: isBusy
+																						? 'text.secondary'
+																						: 'inherit',
+																			cursor:
+																				isRequested || isBusy ? 'default' : 'pointer',
+																			borderWidth: isSelected ? 2 : 1,
+																		}}
+																	/>
+																);
+															})}
+														</Stack>
+														<Stack spacing={1}>
+															{right.map((slot) => {
+																const label = `${slot}–${fromMinutes(
+																	toMinutes(slot) + duration,
+																)}`;
+																const isSelected = selectedSlot === slot;
+																const isRequested =
+																	requestedSlot?.slot === slot &&
+																	requestedSlot.date === dateParam &&
+																	requestedSlot.unitId === selectedUnitId &&
+																	requestedSlot.offeringId === selectedOfferingId;
+																const isBusy = isSlotBooked(
+																	bookingsForUnit,
+																	dateParam,
+																	slot,
+																	duration,
+																);
+
+																return (
+																	<Chip
+																		key={slot}
+																		label={label}
+																		size="medium"
+																		color={isBusy ? 'default' : 'success'}
+																		variant={
+																			isSelected
+																				? 'filled'
+																				: isBusy
+																					? 'outlined'
+																					: 'outlined'
+																		}
+																		onClick={() => {
+																			if (isRequested || isBusy) return;
+																			setSelectedSlot(slot);
+																		}}
+																		sx={{
+																			maxWidth: 200,
+																			px: 1.5,
+																			py: 1.2,
+																			backgroundColor: isRequested
+																				? 'rgba(255, 193, 7, 0.18)'
+																				: isSelected
+																					? 'rgba(76, 175, 80, 0.9)'
+																					: isBusy
+																						? 'rgba(158, 158, 158, 0.15)'
+																						: 'rgba(76, 175, 80, 0.08)',
+																			color: isSelected
+																				? 'common.white'
+																				: isRequested
+																					? 'warning.main'
+																					: isBusy
+																						? 'text.secondary'
+																						: 'inherit',
+																			cursor:
+																				isRequested || isBusy ? 'default' : 'pointer',
+																			borderWidth: isSelected ? 2 : 1,
+																		}}
+																	/>
+																);
+															})}
+														</Stack>
+													</Stack>
+												);
+											})()
 										)}
-									</Box>
+									{selectedSlot && (
+										<Box sx={{ display: 'flex', justifyContent: 'center' }}>
+											<Button
+												variant="contained"
+												disabled={createBookingMutation.isPending}
+												onClick={() => {
+													if (!token) {
+														setBookingToast({
+															message: 'Please log in to book a slot',
+															severity: 'error',
+														});
+														return;
+													}
+													if (!selectedDate || !selectedSlot) return;
+
+													createBookingMutation.mutate({
+														unitId: selectedUnitId,
+														offeringId: selectedOfferingId,
+														startAt: `${dateParam}T${selectedSlot}:00`,
+													});
+												}}
+											>
+												Reserve slot
+											</Button>
+										</Box>
+									)}
 								</Stack>
 							)}
 						</Stack>
@@ -1788,12 +2005,10 @@ function formatDay(day: number) {
 	return map[day] ?? String(day);
 }
 
-function generateAvailableSlots(
+function generateSlots(
 	schedule: { startTime: string; endTime: string }[],
 	stepMin: number,
 	durationMin: number,
-	bookings: BookingSlot[],
-	date: string,
 ) {
 	if (!schedule.length || stepMin <= 0 || durationMin <= 0) return [];
 
@@ -1806,9 +2021,7 @@ function generateAvailableSlots(
 
 		for (let t = start; t + durationMin <= end; t += stepMin) {
 			const slot = fromMinutes(t);
-			if (!isSlotBooked(bookings, date, slot, durationMin)) {
-				slots.add(slot);
-			}
+			slots.add(slot);
 		}
 	}
 

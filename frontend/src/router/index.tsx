@@ -11,6 +11,7 @@ import { LoginPage } from '../pages/LoginPage';
 import { RegisterPage } from '../pages/RegisterPage';
 import { VenueDetailsPage } from '../pages/VenueDetailsPage';
 import { VenueCalendarPage } from '../pages/VenueCalendarPage';
+import { MyBookingsPage } from '../pages/MyBookingsPage';
 import { useAuthStore } from '../store/auth.store';
 
 const rootRoute = createRootRoute({
@@ -54,6 +55,12 @@ const dashboardRoute = createRoute({
 	component: DashboardPage,
 });
 
+const myBookingsRoute = createRoute({
+	getParentRoute: () => protectedRoute,
+	path: '/my-bookings',
+	component: MyBookingsPage,
+});
+
 const venueDetailsRoute = createRoute({
 	getParentRoute: () => rootRoute,
 	path: '/venues/$venueId',
@@ -72,7 +79,7 @@ const routeTree = rootRoute.addChildren([
 	registerRoute,
 	venueDetailsRoute,
 	venueCalendarRoute,
-	protectedRoute.addChildren([dashboardRoute]),
+	protectedRoute.addChildren([dashboardRoute, myBookingsRoute]),
 ]);
 
 export const router = createRouter({ routeTree });

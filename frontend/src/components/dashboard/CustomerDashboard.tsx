@@ -220,7 +220,10 @@ export function CustomerDashboard() {
 
 						<Stack direction="row" spacing={1}>
 							<Button variant="outlined">Map (soon)</Button>
-							<Button variant="contained">
+							<Button
+								variant="contained"
+								onClick={() => navigate({ to: '/my-bookings' })}
+							>
 								My bookings
 							</Button>
 						</Stack>
