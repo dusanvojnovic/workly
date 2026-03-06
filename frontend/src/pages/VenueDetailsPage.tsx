@@ -240,6 +240,7 @@ export function VenueDetailsPage() {
 		category: '',
 		slotStepMin: undefined,
 	});
+	const [isEditingVenue, setIsEditingVenue] = React.useState(false);
 
 	const [unitForm, setUnitForm] = React.useState({
 		name: '',
@@ -346,12 +347,14 @@ export function VenueDetailsPage() {
 
 	const isOwner =
 		!!venue && user?.role === 'PROVIDER' && user.id === venue.providerId;
+	const showVenueForm = isOwner && isEditingVenue;
 
 	const updateMutation = useMutation({
 		mutationFn: (payload: UpdateVenuePayload) =>
 			updateVenue(token!, venueId, payload),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['venue', venueId] });
+			setIsEditingVenue(false);
 		},
 	});
 
@@ -689,12 +692,25 @@ export function VenueDetailsPage() {
 								{venue.address ? ` • ${venue.address}` : ''}
 							</Typography>
 						</Stack>
+						{venue.description?.trim() && (
+							<Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+								{venue.description.trim()}
+							</Typography>
+						)}
 					</Box>
 
 					<Stack direction="row" spacing={1}>
 						<Button component={Link} to="/dashboard" variant="outlined">
 							Back to dashboard
 						</Button>
+						{isOwner && (
+							<Button
+								variant={showVenueForm ? 'contained' : 'outlined'}
+								onClick={() => setIsEditingVenue((prev) => !prev)}
+							>
+								{showVenueForm ? 'Close edit' : 'Edit venue'}
+							</Button>
+						)}
 						<Button
 							variant="contained"
 							onClick={() =>
@@ -711,121 +727,118 @@ export function VenueDetailsPage() {
 			</Paper>
 
 			<Stack spacing={2}>
-				<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-					<Stack spacing={2}>
-						<Typography fontWeight={800}>
-							{isOwner ? 'Edit venue' : 'Venue details'}
-						</Typography>
-
-						<Stack
-							direction={{ xs: 'column', md: 'row' }}
-							spacing={2}
-						>
-							<TextField
-								label="Name"
-								value={form.name ?? ''}
-								onChange={(e) =>
-									setForm((prev) => ({
-										...prev,
-										name: e.target.value,
-									}))
-								}
-								fullWidth
-								disabled={!isOwner}
-								required
-							/>
-
-							<TextField
-								label="City"
-								value={form.city ?? ''}
-								onChange={(e) =>
-									setForm((prev) => ({
-										...prev,
-										city: e.target.value,
-									}))
-								}
-								fullWidth
-								disabled={!isOwner}
-								required
-							/>
-
-							<Select
-								value={form.category ?? ''}
-								onChange={(e) =>
-									setForm((prev) => ({
-										...prev,
-										category: String(e.target.value),
-									}))
-								}
-								fullWidth
-								disabled={!isOwner}
-								displayEmpty
+				{showVenueForm && (
+					<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+						<Stack spacing={2}>
+							<Typography fontWeight={800}>Edit venue</Typography>
+							<Stack
+								direction={{ xs: 'column', md: 'row' }}
+								spacing={2}
 							>
-								{CATEGORY_OPTIONS.map((option) => (
-									<MenuItem key={option} value={option}>
-										{option}
-									</MenuItem>
-								))}
-							</Select>
+								<TextField
+									label="Name"
+									value={form.name ?? ''}
+									onChange={(e) =>
+										setForm((prev) => ({
+											...prev,
+											name: e.target.value,
+										}))
+									}
+									fullWidth
+									disabled={!isOwner}
+									required
+								/>
 
-							<TextField
-								select
-								label="Slot step (min)"
-								value={form.slotStepMin ?? ''}
-								onChange={(e) =>
-									setForm((prev) => ({
-										...prev,
-										slotStepMin: e.target.value
-											? Number(e.target.value)
-											: undefined,
-									}))
-								}
-								fullWidth
-								disabled={!isOwner}
+								<TextField
+									label="City"
+									value={form.city ?? ''}
+									onChange={(e) =>
+										setForm((prev) => ({
+											...prev,
+											city: e.target.value,
+										}))
+									}
+									fullWidth
+									disabled={!isOwner}
+									required
+								/>
+
+								<Select
+									value={form.category ?? ''}
+									onChange={(e) =>
+										setForm((prev) => ({
+											...prev,
+											category: String(e.target.value),
+										}))
+									}
+									fullWidth
+									disabled={!isOwner}
+									displayEmpty
+								>
+									{CATEGORY_OPTIONS.map((option) => (
+										<MenuItem key={option} value={option}>
+											{option}
+										</MenuItem>
+									))}
+								</Select>
+
+								<TextField
+									select
+									label="Slot step (min)"
+									value={form.slotStepMin ?? ''}
+									onChange={(e) =>
+										setForm((prev) => ({
+											...prev,
+											slotStepMin: e.target.value
+												? Number(e.target.value)
+												: undefined,
+										}))
+									}
+									fullWidth
+									disabled={!isOwner}
+								>
+									{[15, 30, 45, 60].map((step) => (
+										<MenuItem key={step} value={step}>
+											{step}
+										</MenuItem>
+									))}
+									<MenuItem value="">No step</MenuItem>
+								</TextField>
+							</Stack>
+
+							<Stack
+								direction={{ xs: 'column', md: 'row' }}
+								spacing={2}
 							>
-								{[15, 30, 45, 60].map((step) => (
-									<MenuItem key={step} value={step}>
-										{step}
-									</MenuItem>
-								))}
-								<MenuItem value="">No step</MenuItem>
-							</TextField>
-						</Stack>
+								<TextField
+									label="Address"
+									value={form.address ?? ''}
+									onChange={(e) =>
+										setForm((prev) => ({
+											...prev,
+											address: e.target.value,
+										}))
+									}
+									fullWidth
+									disabled={!isOwner}
+								/>
 
-						<Stack
-							direction={{ xs: 'column', md: 'row' }}
-							spacing={2}
-						>
-							<TextField
-								label="Address"
-								value={form.address ?? ''}
-								onChange={(e) =>
-									setForm((prev) => ({
-										...prev,
-										address: e.target.value,
-									}))
-								}
-								fullWidth
-								disabled={!isOwner}
-							/>
+								<TextField
+									label="Description"
+									value={form.description ?? ''}
+									onChange={(e) =>
+										setForm((prev) => ({
+											...prev,
+											description: e.target.value,
+										}))
+									}
+									fullWidth
+									disabled={!isOwner}
+									multiline
+									minRows={2}
+								/>
+							</Stack>
 
-							<TextField
-								label="Description"
-								value={form.description ?? ''}
-								onChange={(e) =>
-									setForm((prev) => ({
-										...prev,
-										description: e.target.value,
-									}))
-								}
-								fullWidth
-								disabled={!isOwner}
-								multiline
-								minRows={2}
-							/>
-						</Stack>
-
-						{isOwner && (
 							<Stack direction="row" spacing={1} alignItems="center">
 								<Button
 									variant="contained"
@@ -851,9 +864,9 @@ export function VenueDetailsPage() {
 									</Typography>
 								)}
 							</Stack>
-						)}
-					</Stack>
-				</Paper>
+						</Stack>
+					</Paper>
+				)}
 
 				{!isOwner && (
 					<Dialog
