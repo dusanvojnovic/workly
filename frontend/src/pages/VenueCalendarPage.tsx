@@ -5,11 +5,13 @@ import {
 	Button,
 	Chip,
 	Divider,
+	MenuItem,
 	Paper,
+	Select,
 	Stack,
 	Typography,
 } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -26,6 +28,14 @@ type BookingSlot = {
 	endAt: string;
 };
 
+type BlockSlot = {
+	id: string;
+	unitId: string;
+	startAt: string;
+	endAt: string;
+	reason?: string | null;
+};
+
 async function fetchVenue(venueId: string) {
 	const res = await api.get<VenueDetails>(`/venues/${venueId}`);
 	return res.data;
@@ -38,12 +48,21 @@ async function fetchBookings(venueId: string, date: string) {
 	return res.data;
 }
 
+async function fetchBlocks(venueId: string, date: string) {
+	const res = await api.get<BlockSlot[]>(`/venues/${venueId}/blocks`, {
+		params: { date },
+	});
+	return res.data;
+}
+
 export function VenueCalendarPage() {
 	const { venueId } = useParams({ from: '/venues/$venueId/calendar' });
 	const navigate = useNavigate();
 	const [selectedDate, setSelectedDate] = React.useState<Dayjs | null>(
 		dayjs(),
 	);
+	const [viewMode, setViewMode] = React.useState<'day' | 'week'>('day');
+	const [selectedUnitId, setSelectedUnitId] = React.useState('');
 
 	const {
 		data: venue,
@@ -62,6 +81,50 @@ export function VenueCalendarPage() {
 		queryFn: () => fetchBookings(venueId, dateParam),
 		staleTime: 30_000,
 	});
+	const { data: blocks = [] } = useQuery({
+		queryKey: ['venue-blocks', venueId, dateParam],
+		queryFn: () => fetchBlocks(venueId, dateParam),
+		staleTime: 30_000,
+	});
+
+	const weekBase = selectedDate ?? dayjs();
+	const weekStart = weekBase.subtract((weekBase.day() + 6) % 7, 'day');
+	const weekDates = React.useMemo(
+		() => Array.from({ length: 7 }, (_, i) => weekStart.add(i, 'day')),
+		[weekStart],
+	);
+	const weekQueries = useQueries({
+		queries: weekDates.map((date) => ({
+			queryKey: ['venue-bookings', venueId, date.format('YYYY-MM-DD')],
+			queryFn: () => fetchBookings(venueId, date.format('YYYY-MM-DD')),
+			enabled: viewMode === 'week',
+			staleTime: 30_000,
+		})),
+	});
+	const weekBlockQueries = useQueries({
+		queries: weekDates.map((date) => ({
+			queryKey: ['venue-blocks', venueId, date.format('YYYY-MM-DD')],
+			queryFn: () => fetchBlocks(venueId, date.format('YYYY-MM-DD')),
+			enabled: viewMode === 'week',
+			staleTime: 30_000,
+		})),
+	});
+	const weekBookingsByDate = React.useMemo(() => {
+		const map = new Map<string, BookingSlot[]>();
+		weekDates.forEach((date, index) => {
+			const key = date.format('YYYY-MM-DD');
+			map.set(key, weekQueries[index]?.data ?? []);
+		});
+		return map;
+	}, [weekDates, weekQueries]);
+	const weekBlocksByDate = React.useMemo(() => {
+		const map = new Map<string, BlockSlot[]>();
+		weekDates.forEach((date, index) => {
+			const key = date.format('YYYY-MM-DD');
+			map.set(key, weekBlockQueries[index]?.data ?? []);
+		});
+		return map;
+	}, [weekDates, weekBlockQueries]);
 
 	const dayOfWeek = selectedDate?.day() ?? dayjs().day();
 	const daySchedule = venue?.schedules?.filter(
@@ -81,6 +144,20 @@ export function VenueCalendarPage() {
 		}
 		return map;
 	}, [bookings]);
+	const blocksByUnit = React.useMemo(() => {
+		const map = new Map<string, BlockSlot[]>();
+		for (const block of blocks) {
+			if (!map.has(block.unitId)) map.set(block.unitId, []);
+			map.get(block.unitId)!.push(block);
+		}
+		return map;
+	}, [blocks]);
+
+	React.useEffect(() => {
+		if (!selectedUnitId && venue?.units?.length) {
+			setSelectedUnitId(venue.units[0].id);
+		}
+	}, [selectedUnitId, venue?.units]);
 
 	if (isLoading) {
 		return (
@@ -135,14 +212,53 @@ export function VenueCalendarPage() {
 					alignItems={{ md: 'center' }}
 					spacing={2}
 				>
-					<LocalizationProvider dateAdapter={AdapterDayjs}>
-						<DatePicker
-							label="Date"
-							value={selectedDate}
-							onChange={(value) => setSelectedDate(value)}
-							slotProps={{ textField: { size: 'small' } }}
-						/>
-					</LocalizationProvider>
+						<Stack
+							direction={{ xs: 'column', sm: 'row' }}
+							spacing={1}
+							alignItems={{ sm: 'center' }}
+						>
+							<LocalizationProvider dateAdapter={AdapterDayjs}>
+								<DatePicker
+									label="Date"
+									value={selectedDate}
+									onChange={(value) => setSelectedDate(value)}
+									slotProps={{ textField: { size: 'small' } }}
+								/>
+							</LocalizationProvider>
+							{viewMode === 'week' && (
+								<Select
+									value={selectedUnitId}
+									onChange={(e) =>
+										setSelectedUnitId(String(e.target.value))
+									}
+									size="small"
+									sx={{ minWidth: 200 }}
+									displayEmpty
+								>
+									{venue.units.map((unit) => (
+										<MenuItem key={unit.id} value={unit.id}>
+											{unit.name}
+										</MenuItem>
+									))}
+								</Select>
+							)}
+							<Stack direction="row" spacing={1}>
+								<Button
+									size="small"
+									variant={viewMode === 'day' ? 'contained' : 'outlined'}
+									onClick={() => setViewMode('day')}
+								>
+									Day
+								</Button>
+								<Button
+									size="small"
+									variant={viewMode === 'week' ? 'contained' : 'outlined'}
+									onClick={() => setViewMode('week')}
+								>
+									Week
+								</Button>
+							</Stack>
+						</Stack>
 
 					<Stack spacing={0.5}>
 						<Typography variant="body2" color="text.secondary">
@@ -171,79 +287,209 @@ export function VenueCalendarPage() {
 						alignItems={{ md: 'center' }}
 						spacing={1}
 					>
-						<Typography fontWeight={800}>Daily view</Typography>
+						<Typography fontWeight={800}>
+							{viewMode === 'day' ? 'Daily view' : 'Weekly view'}
+						</Typography>
 						<Typography variant="body2" color="text.secondary">
 							Slot step: {slotStepMin} min
 						</Typography>
 					</Stack>
 
-					{!daySchedule?.length ? (
-						<Typography variant="body2" color="text.secondary">
-							Set working hours to see available slots.
-						</Typography>
-					) : (
-						<Stack spacing={2}>
-							{venue.units.map((unit) => (
-								<Paper key={unit.id} variant="outlined" sx={{ p: 2 }}>
-									<Stack spacing={1}>
-										<Stack
-											direction={{ xs: 'column', md: 'row' }}
-											justifyContent="space-between"
-											alignItems={{ md: 'center' }}
-											spacing={1}
-										>
-											<Typography fontWeight={700}>
-												{unit.name}
-											</Typography>
-											<Typography
-												variant="body2"
-												color="text.secondary"
+					{viewMode === 'day' ? (
+						!daySchedule?.length ? (
+							<Typography variant="body2" color="text.secondary">
+								Set working hours to see available slots.
+							</Typography>
+						) : (
+							<Stack spacing={2}>
+								{venue.units.map((unit) => (
+									<Paper key={unit.id} variant="outlined" sx={{ p: 2 }}>
+										<Stack spacing={1}>
+											<Stack
+												direction={{ xs: 'column', md: 'row' }}
+												justifyContent="space-between"
+												alignItems={{ md: 'center' }}
+												spacing={1}
 											>
-												{unit.unitType}
-											</Typography>
-										</Stack>
-
-										<Divider />
-
-										<Box
-											sx={{
-												display: 'flex',
-												flexWrap: 'wrap',
-												gap: 1,
-											}}
-										>
-											{slots.length === 0 ? (
+												<Typography fontWeight={700}>
+													{unit.name}
+												</Typography>
 												<Typography
 													variant="body2"
 													color="text.secondary"
 												>
-													No slots for this day.
+													{unit.unitType}
 												</Typography>
-											) : (
-												slots.map((slot) => {
+											</Stack>
+
+											<Divider />
+
+											<Box
+												sx={{
+													display: 'flex',
+													flexWrap: 'wrap',
+													gap: 1,
+												}}
+											>
+												{slots.length === 0 ? (
+													<Typography
+														variant="body2"
+														color="text.secondary"
+													>
+														No slots for this day.
+													</Typography>
+												) : (
+													slots.map((slot) => {
 													const isBusy = isSlotBooked(
 														bookingsByUnit.get(unit.id) ?? [],
 														dateParam,
 														slot,
 														slotStepMin,
 													);
-
-													return (
-														<Chip
-															key={`${unit.id}-${slot}`}
-															label={slot}
-															size="small"
-															color={isBusy ? 'default' : 'success'}
-															variant={isBusy ? 'outlined' : 'filled'}
-														/>
+													const isBlocked = isSlotBlocked(
+														blocksByUnit.get(unit.id) ?? [],
+														dateParam,
+														slot,
+														slotStepMin,
 													);
-												})
-											)}
-										</Box>
-									</Stack>
-								</Paper>
-							))}
-						</Stack>
+
+														return (
+															<Chip
+																key={`${unit.id}-${slot}`}
+																label={slot}
+																size="small"
+															color={
+																isBlocked
+																	? 'error'
+																	: isBusy
+																		? 'default'
+																		: 'success'
+															}
+															variant={
+																isBlocked || isBusy ? 'outlined' : 'filled'
+															}
+															/>
+														);
+													})
+												)}
+											</Box>
+										</Stack>
+									</Paper>
+								))}
+							</Stack>
+						)
+					) : (
+						<Box
+							sx={{
+								display: 'grid',
+								gridTemplateColumns: {
+									xs: '1fr',
+									md: 'repeat(7, minmax(0, 1fr))',
+								},
+								gap: 1,
+							}}
+						>
+							{weekDates.map((date) => {
+								const dayKey = date.format('YYYY-MM-DD');
+								const dayBookings = weekBookingsByDate.get(dayKey) ?? [];
+								const dayBlocks = weekBlocksByDate.get(dayKey) ?? [];
+								const scheduleForDay =
+									venue.schedules?.filter(
+										(entry) => entry.dayOfWeek === date.day(),
+									) ?? [];
+								const daySlots = generateSlots(
+									scheduleForDay,
+									slotStepMin,
+								);
+								return (
+									<Paper
+										key={dayKey}
+										variant="outlined"
+										sx={{ p: 1.5 }}
+									>
+										<Stack spacing={1}>
+											<Box>
+												<Typography fontWeight={700}>
+													{date.format('ddd')}
+												</Typography>
+												<Typography
+													variant="caption"
+													color="text.secondary"
+												>
+													{date.format('DD MMM')}
+												</Typography>
+											</Box>
+											<Typography variant="caption" color="text.secondary">
+												{daySlots.length ? 'Schedule set' : 'No schedule'}
+											</Typography>
+											<Box
+												sx={{
+													display: 'flex',
+													flexWrap: 'wrap',
+													gap: 0.5,
+												}}
+											>
+												{daySlots.length === 0 ? (
+													<Typography
+														variant="caption"
+														color="text.secondary"
+													>
+														—
+													</Typography>
+												) : (
+													daySlots.map((slot) => {
+														const unitBookings = selectedUnitId
+															? dayBookings.filter(
+																	(booking) =>
+																		booking.unitId === selectedUnitId,
+															  )
+															: dayBookings;
+														const unitBlocks = selectedUnitId
+															? dayBlocks.filter(
+																	(block) =>
+																		block.unitId === selectedUnitId,
+															  )
+															: dayBlocks;
+														const isBusy = isSlotBooked(
+															unitBookings,
+															dayKey,
+															slot,
+															slotStepMin,
+														);
+														const isBlocked = isSlotBlocked(
+															unitBlocks,
+															dayKey,
+															slot,
+															slotStepMin,
+														);
+														return (
+															<Chip
+																key={`${dayKey}-${slot}`}
+																label={slot}
+																size="small"
+																color={
+																	isBlocked
+																		? 'error'
+																		: isBusy
+																			? 'default'
+																			: 'success'
+																}
+																variant={
+																	isBlocked || isBusy
+																		? 'outlined'
+																		: 'filled'
+																}
+																sx={{ minWidth: 64 }}
+															/>
+														);
+													})
+												)}
+											</Box>
+										</Stack>
+									</Paper>
+								);
+							})}
+						</Box>
 					)}
 				</Stack>
 			</Paper>
@@ -287,6 +533,23 @@ function isSlotBooked(
 		return start < slotEnd && end > slotStart;
 	});
 }
+
+function isSlotBlocked(
+	blocks: BlockSlot[],
+	date: string,
+	slot: string,
+	stepMin: number,
+) {
+	const slotStart = new Date(`${date}T${slot}:00`);
+	const slotEnd = new Date(slotStart.getTime() + stepMin * 60000);
+
+	return blocks.some((block) => {
+		const start = new Date(block.startAt);
+		const end = new Date(block.endAt);
+		return start < slotEnd && end > slotStart;
+	});
+}
+
 
 function toMinutes(time: string) {
 	const [h, m] = time.split(':').map((v) => Number(v));
