@@ -1,7 +1,7 @@
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import { AppBar, Button, IconButton, Toolbar, Typography } from '@mui/material';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { useAuthStore } from '../../store/auth.store';
 import { useThemeMode } from '../../theme/mode';
 
@@ -24,9 +24,11 @@ export const Navbar = () => {
 			}}
 		>
 			<Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Link to="/dashboard">
 				<Typography variant="h5" sx={{ fontWeight: 700 }}>
 					BookMe
 				</Typography>
+                </Link>
 
 				<Toolbar sx={{ gap: 1, minHeight: 'unset', p: 0 }}>
 					{token && (

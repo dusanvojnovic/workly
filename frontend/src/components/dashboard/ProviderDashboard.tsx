@@ -98,6 +98,25 @@ export function ProviderDashboard() {
 		form.city.trim().length > 0 &&
 		form.category.trim().length > 0;
 
+	const metrics = React.useMemo(() => {
+		const cities = new Set(data.map((venue) => venue.city).filter(Boolean));
+		const categories = new Set(
+			data.map((venue) => venue.category).filter(Boolean),
+		);
+		const withDescription = data.filter((venue) =>
+			venue.description?.trim(),
+		).length;
+		const withAddress = data.filter((venue) => venue.address?.trim()).length;
+
+		return [
+			{ label: 'Venues', value: data.length },
+			{ label: 'Cities', value: cities.size },
+			{ label: 'Categories', value: categories.size },
+			{ label: 'With description', value: withDescription },
+			{ label: 'With address', value: withAddress },
+		];
+	}, [data]);
+
 	return (
 		<Box sx={{ width: '100%', maxWidth: 1200 }}>
 			<Paper
@@ -132,6 +151,27 @@ export function ProviderDashboard() {
 					</Stack>
 				</Stack>
 			</Paper>
+
+			<Stack
+				direction={{ xs: 'column', md: 'row' }}
+				spacing={2}
+				sx={{ mb: 2 }}
+			>
+				{metrics.map((metric) => (
+					<Paper
+						key={metric.label}
+						variant="outlined"
+						sx={{ p: 2, borderRadius: 2, flex: 1 }}
+					>
+						<Typography variant="body2" color="text.secondary">
+							{metric.label}
+						</Typography>
+						<Typography variant="h5" fontWeight={800}>
+							{isLoading ? '...' : metric.value}
+						</Typography>
+					</Paper>
+				))}
+			</Stack>
 
 			<Stack spacing={2}>
 				<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>

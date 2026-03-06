@@ -40,6 +40,7 @@ export function CustomerDashboard() {
 	const [q, setQ] = React.useState('');
 	const [city, setCity] = React.useState('all');
 	const [category, setCategory] = React.useState('all');
+	const [sortBy, setSortBy] = React.useState('none');
 	const navigate = useNavigate();
 
 	const {
@@ -62,6 +63,26 @@ export function CustomerDashboard() {
 		const set = new Set(data.map((x) => x.category).filter(Boolean));
 		return ['all', ...Array.from(set)];
 	}, [data]);
+
+	const sortedData = React.useMemo(() => {
+		if (sortBy === 'none') return data;
+		const items = [...data];
+		if (sortBy === 'price-asc') {
+			items.sort((a, b) => {
+				const priceA = a.priceFrom ?? Number.POSITIVE_INFINITY;
+				const priceB = b.priceFrom ?? Number.POSITIVE_INFINITY;
+				return priceA - priceB;
+			});
+		}
+		if (sortBy === 'price-desc') {
+			items.sort((a, b) => {
+				const priceA = a.priceFrom ?? Number.NEGATIVE_INFINITY;
+				const priceB = b.priceFrom ?? Number.NEGATIVE_INFINITY;
+				return priceB - priceA;
+			});
+		}
+		return items;
+	}, [data, sortBy]);
 
 	return (
 		<Box
@@ -99,6 +120,7 @@ export function CustomerDashboard() {
 							setQ('');
 							setCity('all');
 							setCategory('all');
+							setSortBy('none');
 						}}
 					>
 						Reset
@@ -160,6 +182,24 @@ export function CustomerDashboard() {
 									{c === 'all' ? 'All cities' : c}
 								</MenuItem>
 							))}
+						</Select>
+					</Box>
+
+					<Box>
+						<Typography
+							variant="body2"
+							sx={{ mb: 0.75, color: 'text.secondary' }}
+						>
+							Sort by
+						</Typography>
+						<Select
+							fullWidth
+							value={sortBy}
+							onChange={(e) => setSortBy(String(e.target.value))}
+						>
+							<MenuItem value="none">Default</MenuItem>
+							<MenuItem value="price-asc">Price: low to high</MenuItem>
+							<MenuItem value="price-desc">Price: high to low</MenuItem>
 						</Select>
 					</Box>
 
@@ -277,7 +317,7 @@ export function CustomerDashboard() {
 									</Box>
 								</Paper>
 							))
-						: data.map((v) => (
+						: sortedData.map((v) => (
 								<VenueCardItem
 									key={v.id}
 									v={v}
