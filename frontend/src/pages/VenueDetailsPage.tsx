@@ -1,5 +1,6 @@
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import StarIcon from '@mui/icons-material/Star';
 import {
     Alert,
     Box,
@@ -29,7 +30,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 import * as React from 'react';
 import { api } from '../api/api';
 import { useAuthStore } from '../store/auth.store';
-import { type Unit, type VenueDetails } from '../types/venue';
+import { type Unit, type VenueDetails, type VenueReview } from '../types/venue';
 
 type UpdateVenuePayload = {
 	category?: string;
@@ -360,6 +361,7 @@ export function VenueDetailsPage() {
 		message: string;
 		severity: 'success' | 'error';
 	} | null>(null);
+	const [reviewsDialogOpen, setReviewsDialogOpen] = React.useState(false);
 
 	React.useEffect(() => {
 		if (!venue) return;
@@ -844,9 +846,27 @@ export function VenueDetailsPage() {
 					spacing={1}
 				>
 					<Box>
-						<Typography variant="h5" fontWeight={900}>
-							{venue.name}
-						</Typography>
+						<Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+							<Typography variant="h5" fontWeight={900}>
+								{venue.name}
+							</Typography>
+							{venue.avgRating != null && venue.reviewsCount != null && venue.reviewsCount > 0 && (
+								<Stack direction="row" alignItems="center" spacing={0.5}>
+									<StarIcon sx={{ color: 'warning.main', fontSize: 22 }} />
+									<Typography fontWeight={700}>
+										{venue.avgRating}
+									</Typography>
+									<Button
+										size="small"
+										variant="text"
+										onClick={() => setReviewsDialogOpen(true)}
+										sx={{ textTransform: 'none', minWidth: 'auto', px: 0.5 }}
+									>
+										({venue.reviewsCount} {venue.reviewsCount === 1 ? 'review' : 'reviews'})
+									</Button>
+								</Stack>
+							)}
+						</Stack>
 						<Stack direction="row" spacing={0.75} alignItems="center">
 							<LocationOnIcon fontSize="small" />
 							<Typography variant="body2" color="text.secondary">
@@ -887,6 +907,77 @@ export function VenueDetailsPage() {
 					</Stack>
 				</Stack>
 			</Paper>
+
+			{venue.reviewsCount != null && venue.reviewsCount > 0 && (
+				<Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2 }}>
+					<Stack spacing={1.5}>
+						<Stack
+							direction="row"
+							justifyContent="space-between"
+							alignItems="center"
+						>
+							<Typography fontWeight={800}>
+								Reviews
+								{venue.avgRating != null && (
+									<>
+										{' '}
+										<StarIcon sx={{ color: 'warning.main', fontSize: 18, verticalAlign: 'middle' }} />
+										{' '}
+										{venue.avgRating} ({venue.reviewsCount} {venue.reviewsCount === 1 ? 'review' : 'reviews'})
+									</>
+								)}
+							</Typography>
+							<Button
+								size="small"
+								variant="outlined"
+								onClick={() => setReviewsDialogOpen(true)}
+							>
+								See all reviews
+							</Button>
+						</Stack>
+						<Stack spacing={1.5}>
+							{(venue.reviews ?? []).slice(0, 3).map((review) => (
+								<ReviewItem key={review.id} review={review} />
+							))}
+						</Stack>
+					</Stack>
+				</Paper>
+			)}
+
+			<Dialog
+				open={reviewsDialogOpen}
+				onClose={() => setReviewsDialogOpen(false)}
+				maxWidth="sm"
+				fullWidth
+			>
+				<DialogTitle>
+					Reviews
+					{venue.avgRating != null && (
+						<>
+							{' '}
+							<StarIcon sx={{ color: 'warning.main', fontSize: 20, verticalAlign: 'middle' }} />
+							{' '}
+							{venue.avgRating} ({venue.reviewsCount} {venue.reviewsCount === 1 ? 'review' : 'reviews'})
+						</>
+					)}
+				</DialogTitle>
+				<DialogContent dividers>
+					<Stack spacing={2}>
+						{(venue.reviews ?? []).length === 0 ? (
+							<Typography variant="body2" color="text.secondary">
+								No reviews yet.
+							</Typography>
+						) : (
+							(venue.reviews ?? []).map((review) => (
+								<ReviewItem key={review.id} review={review} />
+							))
+						)}
+					</Stack>
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={() => setReviewsDialogOpen(false)}>Close</Button>
+				</DialogActions>
+			</Dialog>
 
 			<Stack spacing={2}>
 				{showVenueForm && (
@@ -2427,6 +2518,50 @@ export function VenueDetailsPage() {
 function formatDay(day: number) {
 	const map = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 	return map[day] ?? String(day);
+}
+
+function formatRelativeDate(dateStr: string) {
+	const d = dayjs(dateStr);
+	const now = dayjs();
+	const days = now.diff(d, 'day');
+	if (days === 0) return 'Today';
+	if (days === 1) return 'Yesterday';
+	if (days < 7) return `${days} days ago`;
+	if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+	if (days < 365) return `${Math.floor(days / 30)} months ago`;
+	return d.format('MMM YYYY');
+}
+
+function ReviewItem({ review }: { review: VenueReview }) {
+	return (
+		<Box
+			sx={{
+				p: 1.5,
+				borderRadius: 1,
+				bgcolor: 'action.hover',
+			}}
+		>
+			<Stack spacing={0.5}>
+				<Stack direction="row" alignItems="center" spacing={0.5}>
+					{Array.from({ length: 5 }).map((_, i) => (
+						<StarIcon
+							key={i}
+							sx={{
+								fontSize: 18,
+								color: i < review.rating ? 'warning.main' : 'action.disabled',
+							}}
+						/>
+					))}
+					<Typography variant="caption" color="text.secondary">
+						{formatRelativeDate(review.createdAt)}
+					</Typography>
+				</Stack>
+				{review.comment?.trim() && (
+					<Typography variant="body2">{review.comment.trim()}</Typography>
+				)}
+			</Stack>
+		</Box>
+	);
 }
 
 function generateSlots(

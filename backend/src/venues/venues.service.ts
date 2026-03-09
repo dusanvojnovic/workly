@@ -125,18 +125,43 @@ export class VenuesService {
   }
 
   async getById(id: string) {
-    const venue = await this.prisma.venue.findUnique({
-      where: { id },
-      include: {
-        units: true,
-        offerings: true,
-        reviews: { take: 5 },
-        schedules: true,
-      },
-    });
+    const [venue, reviewStats] = await Promise.all([
+      this.prisma.venue.findUnique({
+        where: { id },
+        include: {
+          units: true,
+          offerings: true,
+          reviews: {
+            orderBy: { createdAt: 'desc' },
+            select: {
+              id: true,
+              rating: true,
+              comment: true,
+              createdAt: true,
+            },
+          },
+          schedules: true,
+        },
+      }),
+      this.prisma.review.aggregate({
+        where: { venueId: id },
+        _avg: { rating: true },
+        _count: true,
+      }),
+    ]);
 
     if (!venue) throw new NotFoundException('Venue not found');
-    return venue;
+
+    const avgRating =
+      reviewStats._count > 0 && reviewStats._avg.rating != null
+        ? Math.round(reviewStats._avg.rating * 10) / 10
+        : null;
+
+    return {
+      ...venue,
+      avgRating,
+      reviewsCount: reviewStats._count,
+    };
   }
 
   async createUnit(providerId: string, venueId: string, dto: CreateUnitDto) {

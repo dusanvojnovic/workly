@@ -37,6 +37,13 @@ export interface VenueSchedule {
 	endTime: string;
 }
 
+export interface VenueReview {
+	id: string;
+	rating: number;
+	comment: string | null;
+	createdAt: string;
+}
+
 export interface VenueDetails {
 	id: string;
 	providerId: string;
@@ -49,4 +56,7 @@ export interface VenueDetails {
 	units: Unit[];
 	offerings: Offering[];
 	schedules: VenueSchedule[];
+	reviews?: VenueReview[];
+	avgRating?: number | null;
+	reviewsCount?: number;
 }
