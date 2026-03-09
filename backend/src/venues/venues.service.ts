@@ -10,6 +10,7 @@ import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateVenueDto } from './dto/create-venue.dto';
 import { CreateOfferingDto, UpdateOfferingDto } from './dto/offering.dto';
 import { CreateBlockDto } from './dto/create-block.dto';
+import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateVenueDto } from './dto/update-venue.dto';
 import { UpdateVenueScheduleDto } from './dto/update-venue-schedule.dto';
 import { ServiceCategory } from '@prisma/client';
@@ -90,6 +91,7 @@ export class VenuesService {
       include: {
         _count: { select: { units: true, offerings: true } },
         offerings: { select: { price: true }, where: { isActive: true } },
+        reviews: { select: { rating: true } },
       },
     });
 
@@ -98,6 +100,14 @@ export class VenuesService {
         .map((o) => o.price)
         .filter((price): price is number => typeof price === 'number');
       const priceFrom = prices.length ? Math.min(...prices) : null;
+
+      const ratings = venue.reviews.map((r) => r.rating);
+      const reviewsCount = ratings.length;
+      const avgRating =
+        reviewsCount > 0
+          ? Math.round((ratings.reduce((a, b) => a + b, 0) / reviewsCount) * 10) /
+            10
+          : null;
 
       return {
         id: venue.id,
@@ -108,6 +118,8 @@ export class VenuesService {
         unitsCount: venue._count.units,
         offeringsCount: venue._count.offerings,
         priceFrom,
+        avgRating,
+        reviewsCount,
       };
     });
   }
@@ -509,6 +521,55 @@ export class VenuesService {
             price: true,
           },
         },
+        review: {
+          select: {
+            id: true,
+            rating: true,
+            comment: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+  }
+
+  async createReview(
+    customerId: string,
+    bookingId: string,
+    dto: CreateReviewDto,
+  ) {
+    if (!dto.rating || dto.rating < 1 || dto.rating > 5) {
+      throw new BadRequestException('Rating must be between 1 and 5');
+    }
+
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { unit: { include: { venue: true } }, review: true },
+    });
+    if (!booking || booking.customerId !== customerId)
+      throw new NotFoundException('Booking not found');
+    if (booking.review)
+      throw new BadRequestException('Review already submitted');
+    if (booking.endAt > new Date())
+      throw new BadRequestException('Booking not completed yet');
+
+    const existingReview = await this.prisma.review.findFirst({
+      where: {
+        venueId: booking.unit.venueId,
+        authorId: customerId,
+      },
+      select: { id: true },
+    });
+    if (existingReview)
+      throw new BadRequestException('You have already reviewed this venue');
+
+    return this.prisma.review.create({
+      data: {
+        bookingId,
+        venueId: booking.unit.venueId,
+        authorId: customerId,
+        rating: dto.rating,
+        comment: dto.comment?.trim() || null,
       },
     });
   }

@@ -18,6 +18,7 @@ import { CreateVenueDto } from './dto/create-venue.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateOfferingDto, UpdateOfferingDto } from './dto/offering.dto';
 import { CreateBlockDto } from './dto/create-block.dto';
+import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateVenueDto } from './dto/update-venue.dto';
 import { UpdateVenueScheduleDto } from './dto/update-venue-schedule.dto';
 import { VenuesService } from './venues.service';
@@ -78,6 +79,17 @@ export class VenuesController {
   @Get('customer/bookings')
   listCustomerBookings(@Req() req: Request & { user: AuthUser }) {
     return this.venues.listCustomerBookings(req.user.id);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CUSTOMER')
+  @Post('customer/bookings/:id/review')
+  createReview(
+    @Req() req: Request & { user: AuthUser },
+    @Param('id') id: string,
+    @Body() dto: CreateReviewDto,
+  ) {
+    return this.venues.createReview(req.user.id, id, dto);
   }
 
   // PROVIDER

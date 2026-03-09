@@ -1,27 +1,24 @@
-import { Alert, Box, Button, Paper, Stack, Typography } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
+import {
+    Alert,
+    Box,
+    Button,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    Paper,
+    Rating,
+    Stack,
+    TextField,
+    Typography,
+} from '@mui/material';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import dayjs from 'dayjs';
+import * as React from 'react';
 import { api } from '../api/api';
 import { useAuthStore } from '../store/auth.store';
-
-type BookingItem = {
-	id: string;
-	startAt: string;
-	endAt: string;
-	status: string;
-	unit: {
-		id: string;
-		name: string;
-		venue: { id: string; name: string; city: string; address: string | null };
-	};
-	offering: {
-		id: string;
-		name: string;
-		durationMin: number;
-		price: number | null;
-	};
-};
+import { type BookingItem } from '../types/booking';
 
 async function fetchMyBookings(token: string) {
 	const res = await api.get<BookingItem[]>('/customer/bookings', {
@@ -30,9 +27,28 @@ async function fetchMyBookings(token: string) {
 	return res.data;
 }
 
+async function createReview(
+	token: string,
+	bookingId: string,
+	payload: { rating: number; comment?: string },
+) {
+	const res = await api.post(`/customer/bookings/${bookingId}/review`, payload, {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+	return res.data;
+}
+
 export function MyBookingsPage() {
 	const token = useAuthStore((s) => s.token);
 	const navigate = useNavigate();
+	const queryClient = useQueryClient();
+	const [reviewBooking, setReviewBooking] = React.useState<BookingItem | null>(
+		null,
+	);
+	const [reviewRating, setReviewRating] = React.useState<number | null>(5);
+	const [reviewComment, setReviewComment] = React.useState('');
+	const [reviewError, setReviewError] = React.useState<string | null>(null);
+	const [filter, setFilter] = React.useState<'active' | 'done'>('active');
 
 	const {
 		data = [],
@@ -44,6 +60,29 @@ export function MyBookingsPage() {
 		queryFn: () => fetchMyBookings(token!),
 		enabled: !!token,
 		staleTime: 30_000,
+	});
+
+	const createReviewMutation = useMutation({
+		mutationFn: (payload: { bookingId: string; rating: number; comment?: string }) =>
+			createReview(token!, payload.bookingId, {
+				rating: payload.rating,
+				comment: payload.comment,
+			}),
+		onSuccess: () => {
+			setReviewBooking(null);
+			setReviewComment('');
+			setReviewRating(5);
+			setReviewError(null);
+			queryClient.invalidateQueries({ queryKey: ['my-bookings', token] });
+		},
+		onError: (e: unknown) => {
+			const message =
+				typeof e === 'object' && e !== null && 'response' in e
+					? (e as { response?: { data?: { message?: string } } })
+							.response?.data?.message
+					: undefined;
+			setReviewError(message ?? 'Failed to submit review');
+		},
 	});
 
 	if (isLoading) {
@@ -63,6 +102,20 @@ export function MyBookingsPage() {
 		);
 	}
 
+	const now = dayjs();
+	const activeBookings = data.filter((booking) =>
+		dayjs(booking.endAt).isAfter(now),
+	);
+	const doneBookings = data.filter((booking) =>
+		dayjs(booking.endAt).isBefore(now),
+	);
+	const filteredBookings = filter === 'active' ? activeBookings : doneBookings;
+
+	const hasReviewedVenue = (venueId: string) =>
+		data.some(
+			(b) => b.unit.venue.id === venueId && b.review != null,
+		);
+
 	return (
 		<Box sx={{ width: '100%', maxWidth: 1000, mt: 2 }}>
 			<Stack
@@ -80,15 +133,37 @@ export function MyBookingsPage() {
 				</Button>
 			</Stack>
 
-			{data.length === 0 ? (
+			<Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+				<Button
+					variant={filter === 'active' ? 'contained' : 'outlined'}
+					onClick={() => setFilter('active')}
+				>
+					Active
+				</Button>
+				<Button
+					variant={filter === 'done' ? 'contained' : 'outlined'}
+					onClick={() => setFilter('done')}
+				>
+					Done
+				</Button>
+			</Stack>
+
+			{filteredBookings.length === 0 ? (
 				<Typography variant="body2" color="text.secondary">
-					No bookings yet.
+					{filter === 'active'
+						? 'No active bookings.'
+						: 'No completed bookings.'}
 				</Typography>
 			) : (
 				<Stack spacing={1.5}>
-					{data.map((booking) => {
+					{filteredBookings.map((booking) => {
 						const start = dayjs(booking.startAt);
 						const end = dayjs(booking.endAt);
+						const isPast = end.isBefore(dayjs());
+						const canReview =
+							isPast &&
+							!booking.review &&
+							!hasReviewedVenue(booking.unit.venue.id);
 
 						return (
 							<Paper key={booking.id} variant="outlined" sx={{ p: 2 }}>
@@ -143,11 +218,96 @@ export function MyBookingsPage() {
 										</Typography>
 									</Box>
 								</Stack>
+								{filter === 'done' && (
+									<Stack
+										direction={{ xs: 'column', sm: 'row' }}
+										justifyContent="space-between"
+										alignItems={{ sm: 'center' }}
+										spacing={1}
+										sx={{ mt: 1 }}
+									>
+										{booking.review ? (
+											<Stack
+												direction="row"
+												spacing={1}
+												alignItems="center"
+											>
+												<Rating
+													size="small"
+													readOnly
+													value={booking.review.rating}
+												/>
+												<Typography
+													variant="body2"
+													color="text.secondary"
+												>
+													{booking.review.comment ?? ''}
+												</Typography>
+											</Stack>
+										) : null}
+										{canReview && (
+											<Button
+												size="small"
+												variant="outlined"
+												onClick={() => {
+													setReviewBooking(booking);
+													setReviewRating(5);
+													setReviewComment('');
+													setReviewError(null);
+												}}
+											>
+												Leave review
+											</Button>
+										)}
+									</Stack>
+								)}
 							</Paper>
 						);
 					})}
 				</Stack>
 			)}
+			<Dialog
+				open={!!reviewBooking}
+				onClose={() => setReviewBooking(null)}
+				fullWidth
+				maxWidth="sm"
+			>
+				<DialogTitle>Leave a review</DialogTitle>
+				<DialogContent sx={{ pt: 2 }}>
+					<Stack spacing={2}>
+						{reviewError && <Alert severity="error">{reviewError}</Alert>}
+						<Rating
+							value={reviewRating}
+							onChange={(_, value) => setReviewRating(value)}
+						/>
+						<TextField
+							label="Comment (optional)"
+							value={reviewComment}
+							onChange={(e) => setReviewComment(e.target.value)}
+							fullWidth
+							multiline
+							minRows={3}
+						/>
+					</Stack>
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={() => setReviewBooking(null)}>Cancel</Button>
+					<Button
+						variant="contained"
+						disabled={!reviewRating || createReviewMutation.isPending}
+						onClick={() => {
+							if (!reviewBooking || !reviewRating) return;
+							createReviewMutation.mutate({
+								bookingId: reviewBooking.id,
+								rating: reviewRating,
+								comment: reviewComment.trim() || undefined,
+							});
+						}}
+					>
+						Submit
+					</Button>
+				</DialogActions>
+			</Dialog>
 		</Box>
 	);
 }
