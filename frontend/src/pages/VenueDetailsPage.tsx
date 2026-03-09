@@ -724,7 +724,7 @@ export function VenueDetailsPage() {
 	}
 
 	return (
-		<Box sx={{ width: '100%', maxWidth: 1200, mt: 2 }}>
+		<Box sx={{ width: '100%', maxWidth: 1200, mx: 'auto', mt: 0 }}>
 			<Snackbar
 				open={updateScheduleMutation.isSuccess}
 				autoHideDuration={2500}

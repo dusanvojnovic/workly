@@ -15,7 +15,7 @@ export function AppLayout() {
 		<Box
 			sx={{
 				minHeight: '100vh',
-				width: '100vw',
+				width: '100%',
 				display: 'flex',
 				flexDirection: 'column',
 				background: (theme) =>
@@ -30,17 +30,12 @@ export function AppLayout() {
 				sx={{
 					flex: 1,
 					width: '100%',
-					display: 'flex',
-					alignItems: 'center',
-					justifyContent: 'center',
 					px: 2,
 					pt: 10,
 				}}
 			>
-				<Container sx={{ width: '100%' }}>
-					<Box sx={{ display: 'flex', justifyContent: 'center' }}>
-						<Outlet />
-					</Box>
+				<Container maxWidth="lg" sx={{ width: '100%', mx: 'auto' }}>
+					<Outlet />
 				</Container>
 			</Box>
 		</Box>
