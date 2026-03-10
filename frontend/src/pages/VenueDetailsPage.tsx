@@ -1478,9 +1478,28 @@ export function VenueDetailsPage() {
 					</Dialog>
 				)}
 
-				<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-					<Stack spacing={2}>
-						<Typography fontWeight={800}>Opening hours</Typography>
+				<Box
+					sx={{
+						...(isOwner
+							? {
+									display: 'flex',
+									flexDirection: 'column',
+									gap: 2,
+								}
+							: {
+									display: 'grid',
+									gridTemplateColumns: {
+										xs: '1fr',
+										md: 'minmax(240px, 0.32fr) 1fr',
+									},
+									gap: 2,
+									alignItems: 'stretch',
+								}),
+					}}
+				>
+					<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+						<Stack spacing={2}>
+							<Typography fontWeight={800}>Opening hours</Typography>
 
 						{isOwner ? (
 							<>
@@ -1668,142 +1687,300 @@ export function VenueDetailsPage() {
 					</Stack>
 				</Paper>
 
-				{isOwner && (
 					<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-						<Stack spacing={2}>
-							<Stack
-								direction={{ xs: 'column', md: 'row' }}
-								justifyContent="space-between"
-								alignItems={{ md: 'center' }}
-								spacing={1}
-							>
-								<Typography fontWeight={800}>Blocks</Typography>
-								<Typography variant="body2" color="text.secondary">
-									Temporarily block units for maintenance or outages.
-								</Typography>
-							</Stack>
+						<Stack
+							direction={{ xs: 'column', md: 'row' }}
+							justifyContent="space-between"
+							alignItems={{ md: 'center' }}
+							spacing={1}
+						>
+							<Typography fontWeight={800}>Offerings</Typography>
+							<Typography variant="body2" color="text.secondary">
+								{venue.offerings.length} total
+							</Typography>
+						</Stack>
 
-							<Stack
-								direction={{ xs: 'column', md: 'row' }}
-								spacing={2}
-								alignItems={{ md: 'center' }}
-							>
-								<Select
-									value={blockUnitId}
-									onChange={(e) => setBlockUnitId(String(e.target.value))}
-									sx={{ minWidth: 220 }}
-									displayEmpty
+						<Divider sx={{ my: 2 }} />
+
+						{isOwner && (
+							<Stack spacing={2} sx={{ mb: 2 }}>
+								<Typography fontWeight={700}>Add offering</Typography>
+								<Stack
+									direction={{ xs: 'column', md: 'row' }}
+									spacing={2}
 								>
-									<MenuItem value="all">All units</MenuItem>
-									{venue.units.map((unit) => (
-										<MenuItem key={unit.id} value={unit.id}>
-											{unit.name}
-										</MenuItem>
-									))}
-								</Select>
+									<TextField
+										label="Name"
+										value={offeringForm.name}
+										onChange={(e) =>
+											setOfferingForm((prev) => ({
+												...prev,
+												name: e.target.value,
+											}))
+										}
+										fullWidth
+									/>
+									<TextField
+										select
+										label="Duration (min)"
+										value={offeringForm.durationMin}
+										onChange={(e) =>
+											setOfferingForm((prev) => ({
+												...prev,
+												durationMin: e.target.value,
+											}))
+										}
+										fullWidth
+									>
+										{[30, 45, 60, 90, 120, 150, 180].map((val) => (
+											<MenuItem key={val} value={val}>
+												{val}
+											</MenuItem>
+										))}
+									</TextField>
+									<TextField
+										label="Price (RSD)"
+										type="number"
+										value={offeringForm.price}
+										onChange={(e) =>
+											setOfferingForm((prev) => ({
+												...prev,
+												price: e.target.value,
+											}))
+										}
+										fullWidth
+									/>
+								</Stack>
+								<Stack direction="row" spacing={1} alignItems="center">
+									<Button
+										variant="contained"
+										disabled={!canAddOffering || createOfferingMutation.isPending}
+										onClick={() => {
+											const durationMin = String(
+												offeringForm.durationMin,
+											).trim()
+												? Number(offeringForm.durationMin)
+												: NaN;
+											const price = String(offeringForm.price).trim()
+												? Number(offeringForm.price)
+												: undefined;
 
-								<LocalizationProvider dateAdapter={AdapterDayjs}>
-									<DatePicker
-										label="Date"
-										value={blockDate}
-										onChange={(value) => setBlockDate(value)}
-										slotProps={{ textField: { size: 'small' } }}
-									/>
-									<TimePicker
-										label="Start"
-										ampm={false}
-										value={blockStart}
-										onChange={(value) => setBlockStart(value)}
-										slotProps={{
-											textField: { size: 'small', sx: { width: 140 } },
+											if (
+												!offeringForm.name.trim() ||
+												Number.isNaN(durationMin)
+											) {
+												setOfferingToast({
+													message: 'Please fill name and duration',
+													severity: 'error',
+												});
+												return;
+											}
+
+											createOfferingMutation.mutate({
+												name: offeringForm.name.trim(),
+												durationMin,
+												price: Number.isNaN(price) ? undefined : price,
+											});
 										}}
-									/>
-									<TimePicker
-										label="End"
-										ampm={false}
-										value={blockEnd}
-										onChange={(value) => setBlockEnd(value)}
-										slotProps={{
-											textField: { size: 'small', sx: { width: 140 } },
-										}}
-									/>
-								</LocalizationProvider>
+									>
+										Add offering
+									</Button>
+								</Stack>
+								<Divider />
 							</Stack>
+						)}
 
-							<TextField
-								label="Reason (optional)"
-								value={blockReason}
-								onChange={(e) => setBlockReason(e.target.value)}
-								fullWidth
-							/>
-
-							<Stack direction="row" spacing={1} alignItems="center">
-								<Button
-									variant="contained"
-									disabled={!canCreateBlock || createBlocksMutation.isPending}
-									onClick={() => {
-										if (!blockDate || !blockStart || !blockEnd) return;
-										const date = blockDate.format('YYYY-MM-DD');
-										const targets =
-											blockUnitId === 'all'
-												? venue.units.map((unit) => unit.id)
-												: [blockUnitId];
-										createBlocksMutation.mutate(
-											targets.map((unitId) => ({
-												unitId,
-												startAt: `${date}T${blockStart.format('HH:mm')}:00`,
-												endAt: `${date}T${blockEnd.format('HH:mm')}:00`,
-												reason: blockReason.trim() || undefined,
-											})),
-										);
+						{venue.offerings.length === 0 ? (
+							<Typography variant="body2" color="text.secondary">
+								No offerings yet.
+							</Typography>
+						) : (
+							<Stack spacing={1}>
+								<Box
+									sx={{
+										display: 'grid',
+										gridTemplateColumns: isOwner
+											? 'minmax(160px, 1.6fr) minmax(120px, 0.7fr) minmax(110px, 0.7fr) minmax(140px, 1fr)'
+											: 'minmax(160px, 1.6fr) minmax(120px, 0.7fr) minmax(110px, 0.7fr)',
+										gap: 1,
+										px: 1,
+										color: 'text.secondary',
 									}}
 								>
-									Add block
-								</Button>
-								{blockError && (
-									<Typography variant="body2" color="error">
-										{blockError}
+									<Typography variant="caption" noWrap>
+										Name
 									</Typography>
-								)}
-							</Stack>
-
-							<Divider />
-
-							<Stack spacing={1}>
-								<Typography fontWeight={700}>
-									Blocks for {blockDateParam}
-								</Typography>
-								{!blocksForDay.length ? (
-									<Typography variant="body2" color="text.secondary">
-										No blocks for this day.
+									<Typography variant="caption" noWrap align="right">
+										Duration
 									</Typography>
-								) : (
-									blocksForDay.map((block) => {
-										const unitName =
-											venue.units.find((u) => u.id === block.unitId)?.name ??
-											'Unit';
-										return (
-											<Stack
-												key={block.id}
-												direction="row"
-												justifyContent="space-between"
-												alignItems="center"
-												spacing={1}
-											>
-												<Typography variant="body2">
-													{unitName} •{' '}
-													{dayjs(block.startAt).format('HH:mm')}-
-													{dayjs(block.endAt).format('HH:mm')}
-													{block.reason ? ` • ${block.reason}` : ''}
-												</Typography>
-											</Stack>
-										);
-									})
-								)}
+									<Typography variant="caption" noWrap align="right">
+										Price
+									</Typography>
+									{isOwner && (
+										<Typography variant="caption" noWrap align="right">
+											Actions
+										</Typography>
+									)}
+								</Box>
+
+								{venue.offerings.map((offering) => (
+									<Paper key={offering.id} variant="outlined" sx={{ p: 1.5 }}>
+										<Box
+											sx={{
+												display: 'grid',
+												gridTemplateColumns: isOwner
+													? 'minmax(160px, 1.6fr) minmax(120px, 0.7fr) minmax(110px, 0.7fr) minmax(140px, 1fr)'
+													: 'minmax(160px, 1.6fr) minmax(120px, 0.7fr) minmax(110px, 0.7fr)',
+												gap: 1,
+												alignItems: 'center',
+											}}
+										>
+											{editingOfferingId === offering.id ? (
+												<>
+													<TextField
+														size="small"
+														value={editingOfferingForm.name}
+														onChange={(e) =>
+															setEditingOfferingForm((prev) => ({
+																...prev,
+																name: e.target.value,
+															}))
+														}
+													/>
+													<TextField
+														size="small"
+														select
+														value={editingOfferingForm.durationMin}
+														onChange={(e) =>
+															setEditingOfferingForm((prev) => ({
+																...prev,
+																durationMin: e.target.value,
+															}))
+														}
+													>
+														{[30, 45, 60, 90, 120, 150, 180].map((val) => (
+															<MenuItem key={val} value={val}>
+																{val}
+															</MenuItem>
+														))}
+													</TextField>
+													<TextField
+														size="small"
+														type="number"
+														value={editingOfferingForm.price}
+														onChange={(e) =>
+															setEditingOfferingForm((prev) => ({
+																...prev,
+																price: e.target.value,
+															}))
+														}
+													/>
+													<Stack direction="row" spacing={1} justifyContent="flex-end">
+														<Button
+															size="small"
+															variant="contained"
+															disabled={updateOfferingMutation.isPending}
+															onClick={() => {
+																const durationMin = String(
+																	editingOfferingForm.durationMin,
+																).trim()
+																	? Number(editingOfferingForm.durationMin)
+																	: NaN;
+																const price = String(
+																	editingOfferingForm.price,
+																).trim()
+																	? Number(editingOfferingForm.price)
+																	: undefined;
+
+																if (
+																	!editingOfferingForm.name.trim() ||
+																	Number.isNaN(durationMin)
+																) {
+																	setOfferingToast({
+																		message: 'Please fill name and duration',
+																		severity: 'error',
+																	});
+																	return;
+																}
+
+																updateOfferingMutation.mutate({
+																	offeringId: offering.id,
+																	data: {
+																		name: editingOfferingForm.name.trim(),
+																		durationMin,
+																		price: Number.isNaN(price)
+																			? undefined
+																			: price,
+																	},
+																});
+															}}
+														>
+															Save
+														</Button>
+														<Button
+															size="small"
+															onClick={() => setEditingOfferingId(null)}
+														>
+															Cancel
+														</Button>
+													</Stack>
+												</>
+											) : (
+												<>
+													<Typography fontWeight={700} noWrap>
+														{offering.name}
+													</Typography>
+													<Typography
+														variant="body2"
+														color="text.secondary"
+														align="right"
+													>
+														{offering.durationMin} min
+													</Typography>
+													<Typography
+														variant="body2"
+														color="text.secondary"
+														align="right"
+													>
+														{offering.price != null ? `${offering.price} RSD` : '—'}
+													</Typography>
+													{isOwner && (
+														<Stack direction="row" spacing={1} justifyContent="flex-end">
+															<Button
+																size="small"
+																onClick={() => {
+																	setEditingOfferingId(offering.id);
+																	setEditingOfferingForm({
+																		name: offering.name,
+																		durationMin: String(offering.durationMin),
+																		price:
+																			offering.price != null
+																				? String(offering.price)
+																				: '',
+																	});
+																}}
+															>
+																Edit
+															</Button>
+															<Button
+																size="small"
+																color="error"
+																disabled={deleteOfferingMutation.isPending}
+																onClick={() => setDeleteOfferingId(offering.id)}
+															>
+																Delete
+															</Button>
+														</Stack>
+													)}
+												</>
+											)}
+										</Box>
+									</Paper>
+								))}
 							</Stack>
-						</Stack>
-					</Paper>
-				)}
+						)}
+				</Paper>
+				</Box>
 
 				<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
 					<Stack
@@ -2219,297 +2396,142 @@ export function VenueDetailsPage() {
 					)}
 				</Paper>
 
-				<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-					<Stack
-						direction={{ xs: 'column', md: 'row' }}
-						justifyContent="space-between"
-						alignItems={{ md: 'center' }}
-						spacing={1}
-					>
-						<Typography fontWeight={800}>Offerings</Typography>
-						<Typography variant="body2" color="text.secondary">
-							{venue.offerings.length} total
-						</Typography>
-					</Stack>
+				{isOwner && (
+					<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+						<Stack spacing={2}>
+							<Stack
+								direction={{ xs: 'column', md: 'row' }}
+								justifyContent="space-between"
+								alignItems={{ md: 'center' }}
+								spacing={1}
+							>
+								<Typography fontWeight={800}>Blocks</Typography>
+								<Typography variant="body2" color="text.secondary">
+									Temporarily block units for maintenance or outages.
+								</Typography>
+							</Stack>
 
-					<Divider sx={{ my: 2 }} />
-
-					{isOwner && (
-						<Stack spacing={2} sx={{ mb: 2 }}>
-							<Typography fontWeight={700}>Add offering</Typography>
 							<Stack
 								direction={{ xs: 'column', md: 'row' }}
 								spacing={2}
+								alignItems={{ md: 'center' }}
 							>
-								<TextField
-									label="Name"
-									value={offeringForm.name}
-									onChange={(e) =>
-										setOfferingForm((prev) => ({
-											...prev,
-											name: e.target.value,
-										}))
-									}
-									fullWidth
-								/>
-								<TextField
-									select
-									label="Duration (min)"
-									value={offeringForm.durationMin}
-									onChange={(e) =>
-										setOfferingForm((prev) => ({
-											...prev,
-											durationMin: e.target.value,
-										}))
-									}
-									fullWidth
+								<Select
+									value={blockUnitId}
+									onChange={(e) => setBlockUnitId(String(e.target.value))}
+									sx={{ minWidth: 220 }}
+									displayEmpty
 								>
-									{[30, 45, 60, 90, 120, 150, 180].map((val) => (
-										<MenuItem key={val} value={val}>
-											{val}
+									<MenuItem value="all">All units</MenuItem>
+									{venue.units.map((unit) => (
+										<MenuItem key={unit.id} value={unit.id}>
+											{unit.name}
 										</MenuItem>
 									))}
-								</TextField>
-								<TextField
-									label="Price (RSD)"
-									type="number"
-									value={offeringForm.price}
-									onChange={(e) =>
-										setOfferingForm((prev) => ({
-											...prev,
-											price: e.target.value,
-										}))
-									}
-									fullWidth
-								/>
+								</Select>
+
+								<LocalizationProvider dateAdapter={AdapterDayjs}>
+									<DatePicker
+										label="Date"
+										value={blockDate}
+										onChange={(value) => setBlockDate(value)}
+										slotProps={{ textField: { size: 'small' } }}
+									/>
+									<TimePicker
+										label="Start"
+										ampm={false}
+										value={blockStart}
+										onChange={(value) => setBlockStart(value)}
+										slotProps={{
+											textField: { size: 'small', sx: { width: 140 } },
+										}}
+									/>
+									<TimePicker
+										label="End"
+										ampm={false}
+										value={blockEnd}
+										onChange={(value) => setBlockEnd(value)}
+										slotProps={{
+											textField: { size: 'small', sx: { width: 140 } },
+										}}
+									/>
+								</LocalizationProvider>
 							</Stack>
+
+							<TextField
+								label="Reason (optional)"
+								value={blockReason}
+								onChange={(e) => setBlockReason(e.target.value)}
+								fullWidth
+							/>
+
 							<Stack direction="row" spacing={1} alignItems="center">
 								<Button
 									variant="contained"
-									disabled={!canAddOffering || createOfferingMutation.isPending}
+									disabled={!canCreateBlock || createBlocksMutation.isPending}
 									onClick={() => {
-										const durationMin = String(
-											offeringForm.durationMin,
-										).trim()
-											? Number(offeringForm.durationMin)
-											: NaN;
-										const price = String(offeringForm.price).trim()
-											? Number(offeringForm.price)
-											: undefined;
-
-										if (
-											!offeringForm.name.trim() ||
-											Number.isNaN(durationMin)
-										) {
-											setOfferingToast({
-												message: 'Please fill name and duration',
-												severity: 'error',
-											});
-											return;
-										}
-
-										createOfferingMutation.mutate({
-											name: offeringForm.name.trim(),
-											durationMin,
-											price: Number.isNaN(price) ? undefined : price,
-										});
+										if (!blockDate || !blockStart || !blockEnd) return;
+										const date = blockDate.format('YYYY-MM-DD');
+										const targets =
+											blockUnitId === 'all'
+												? venue.units.map((unit) => unit.id)
+												: [blockUnitId];
+										createBlocksMutation.mutate(
+											targets.map((unitId) => ({
+												unitId,
+												startAt: `${date}T${blockStart.format('HH:mm')}:00`,
+												endAt: `${date}T${blockEnd.format('HH:mm')}:00`,
+												reason: blockReason.trim() || undefined,
+											})),
+										);
 									}}
 								>
-									Add offering
+									Add block
 								</Button>
+								{blockError && (
+									<Typography variant="body2" color="error">
+										{blockError}
+									</Typography>
+								)}
 							</Stack>
+
 							<Divider />
+
+							<Stack spacing={1}>
+								<Typography fontWeight={700}>
+									Blocks for {blockDateParam}
+								</Typography>
+								{!blocksForDay.length ? (
+									<Typography variant="body2" color="text.secondary">
+										No blocks for this day.
+									</Typography>
+								) : (
+									blocksForDay.map((block) => {
+										const unitName =
+											venue.units.find((u) => u.id === block.unitId)?.name ??
+											'Unit';
+										return (
+											<Stack
+												key={block.id}
+												direction="row"
+												justifyContent="space-between"
+												alignItems="center"
+												spacing={1}
+											>
+												<Typography variant="body2">
+													{unitName} •{' '}
+													{dayjs(block.startAt).format('HH:mm')}-
+													{dayjs(block.endAt).format('HH:mm')}
+													{block.reason ? ` • ${block.reason}` : ''}
+												</Typography>
+											</Stack>
+										);
+									})
+								)}
+							</Stack>
 						</Stack>
-					)}
-
-					{venue.offerings.length === 0 ? (
-						<Typography variant="body2" color="text.secondary">
-							No offerings yet.
-						</Typography>
-					) : (
-						<Stack spacing={1}>
-							<Box
-								sx={{
-									display: 'grid',
-									gridTemplateColumns:
-										'minmax(160px, 1.6fr) minmax(120px, 0.7fr) minmax(110px, 0.7fr) minmax(140px, 1fr)',
-									gap: 1,
-									px: 1,
-									color: 'text.secondary',
-								}}
-							>
-								<Typography variant="caption" noWrap>
-									Name
-								</Typography>
-								<Typography variant="caption" noWrap align="right">
-									Duration
-								</Typography>
-								<Typography variant="caption" noWrap align="right">
-									Price
-								</Typography>
-								<Typography variant="caption" noWrap align="right">
-									Actions
-								</Typography>
-							</Box>
-
-							{venue.offerings.map((offering) => (
-								<Paper key={offering.id} variant="outlined" sx={{ p: 1.5 }}>
-									<Box
-										sx={{
-											display: 'grid',
-											gridTemplateColumns:
-												'minmax(160px, 1.6fr) minmax(120px, 0.7fr) minmax(110px, 0.7fr) minmax(140px, 1fr)',
-											gap: 1,
-											alignItems: 'center',
-										}}
-									>
-										{editingOfferingId === offering.id ? (
-											<>
-												<TextField
-													size="small"
-													value={editingOfferingForm.name}
-													onChange={(e) =>
-														setEditingOfferingForm((prev) => ({
-															...prev,
-															name: e.target.value,
-														}))
-													}
-												/>
-												<TextField
-													size="small"
-													select
-													value={editingOfferingForm.durationMin}
-													onChange={(e) =>
-														setEditingOfferingForm((prev) => ({
-															...prev,
-															durationMin: e.target.value,
-														}))
-													}
-												>
-													{[30, 45, 60, 90, 120, 150, 180].map((val) => (
-														<MenuItem key={val} value={val}>
-															{val}
-														</MenuItem>
-													))}
-												</TextField>
-												<TextField
-													size="small"
-													type="number"
-													value={editingOfferingForm.price}
-													onChange={(e) =>
-														setEditingOfferingForm((prev) => ({
-															...prev,
-															price: e.target.value,
-														}))
-													}
-												/>
-												<Stack direction="row" spacing={1} justifyContent="flex-end">
-													<Button
-														size="small"
-														variant="contained"
-														disabled={updateOfferingMutation.isPending}
-														onClick={() => {
-															const durationMin = String(
-																editingOfferingForm.durationMin,
-															).trim()
-																? Number(editingOfferingForm.durationMin)
-																: NaN;
-															const price = String(
-																editingOfferingForm.price,
-															).trim()
-																? Number(editingOfferingForm.price)
-																: undefined;
-
-															if (
-																!editingOfferingForm.name.trim() ||
-																Number.isNaN(durationMin)
-															) {
-																setOfferingToast({
-																	message: 'Please fill name and duration',
-																	severity: 'error',
-																});
-																return;
-															}
-
-															updateOfferingMutation.mutate({
-																offeringId: offering.id,
-																data: {
-																	name: editingOfferingForm.name.trim(),
-																	durationMin,
-																	price: Number.isNaN(price)
-																		? undefined
-																		: price,
-																},
-															});
-														}}
-													>
-														Save
-													</Button>
-													<Button
-														size="small"
-														onClick={() => setEditingOfferingId(null)}
-													>
-														Cancel
-													</Button>
-												</Stack>
-											</>
-										) : (
-											<>
-												<Typography fontWeight={700} noWrap>
-													{offering.name}
-												</Typography>
-												<Typography
-													variant="body2"
-													color="text.secondary"
-													align="right"
-												>
-													{offering.durationMin} min
-												</Typography>
-												<Typography
-													variant="body2"
-													color="text.secondary"
-													align="right"
-												>
-													{offering.price != null ? `${offering.price} RSD` : '—'}
-												</Typography>
-												<Stack direction="row" spacing={1} justifyContent="flex-end">
-													{isOwner && (
-														<Button
-															size="small"
-															onClick={() => {
-																setEditingOfferingId(offering.id);
-																setEditingOfferingForm({
-																	name: offering.name,
-																	durationMin: String(offering.durationMin),
-																	price:
-																		offering.price != null
-																			? String(offering.price)
-																			: '',
-																});
-															}}
-														>
-															Edit
-														</Button>
-													)}
-													{isOwner && (
-														<Button
-															size="small"
-															color="error"
-															disabled={deleteOfferingMutation.isPending}
-															onClick={() => setDeleteOfferingId(offering.id)}
-														>
-															Delete
-														</Button>
-													)}
-												</Stack>
-											</>
-										)}
-									</Box>
-								</Paper>
-							))}
-						</Stack>
-					)}
-				</Paper>
+					</Paper>
+				)}
 			</Stack>
 		</Box>
 	);
