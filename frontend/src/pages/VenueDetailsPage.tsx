@@ -508,8 +508,9 @@ export function VenueDetailsPage() {
 			queryClient.invalidateQueries({
 				queryKey: ['venue-bookings', venueId, dateParam],
 			});
+			queryClient.invalidateQueries({ queryKey: ['notifications-unread'] });
 			setBookingToast({
-				message: 'Uspesno ste rezervisali termin.',
+				message: 'Booking successful.',
 				severity: 'success',
 			});
 			setBookingAttempted(false);
@@ -2188,7 +2189,7 @@ export function VenueDetailsPage() {
 								sx={{
 									display: 'grid',
 									gridTemplateColumns:
-										'minmax(160px, 1.4fr) minmax(120px, 0.8fr) minmax(80px, 0.6fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) minmax(140px, 1fr)',
+										'minmax(160px, 1.4fr) minmax(120px, 0.8fr) minmax(80px, 0.6fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) minmax(90px, 0.6fr) minmax(140px, 1fr)',
 									gap: 1,
 									px: 1,
 									color: 'text.secondary',
@@ -2210,6 +2211,9 @@ export function VenueDetailsPage() {
 									Max duration
 								</Typography>
 								<Typography variant="caption" noWrap align="right">
+									Slot step
+								</Typography>
+								<Typography variant="caption" noWrap align="right">
 									Actions
 								</Typography>
 							</Box>
@@ -2220,7 +2224,7 @@ export function VenueDetailsPage() {
 										sx={{
 											display: 'grid',
 											gridTemplateColumns:
-												'minmax(160px, 1.4fr) minmax(120px, 0.8fr) minmax(80px, 0.6fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) minmax(140px, 1fr)',
+												'minmax(160px, 1.4fr) minmax(120px, 0.8fr) minmax(80px, 0.6fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) minmax(90px, 0.6fr) minmax(140px, 1fr)',
 											gap: 1,
 											alignItems: 'center',
 										}}
@@ -2259,6 +2263,7 @@ export function VenueDetailsPage() {
 												/>
 												<TextField
 													size="small"
+													select
 													value={editingUnitForm.minDurationMin}
 													onChange={(e) =>
 														setEditingUnitForm((prev) => ({
@@ -2266,9 +2271,17 @@ export function VenueDetailsPage() {
 															minDurationMin: e.target.value,
 														}))
 													}
-												/>
+												>
+													{[30, 45, 60, 90, 120, 150, 180].map((val) => (
+														<MenuItem key={val} value={val}>
+															{val}
+														</MenuItem>
+													))}
+													<MenuItem value="">No min</MenuItem>
+												</TextField>
 												<TextField
 													size="small"
+													select
 													value={editingUnitForm.maxDurationMin}
 													onChange={(e) =>
 														setEditingUnitForm((prev) => ({
@@ -2276,7 +2289,32 @@ export function VenueDetailsPage() {
 															maxDurationMin: e.target.value,
 														}))
 													}
-												/>
+												>
+													{[30, 45, 60, 90, 120, 150, 180].map((val) => (
+														<MenuItem key={val} value={val}>
+															{val}
+														</MenuItem>
+													))}
+													<MenuItem value="">No max</MenuItem>
+												</TextField>
+												<TextField
+													size="small"
+													select
+													value={editingUnitForm.slotStepMin}
+													onChange={(e) =>
+														setEditingUnitForm((prev) => ({
+															...prev,
+															slotStepMin: e.target.value,
+														}))
+													}
+												>
+													{[15, 30, 45, 60].map((val) => (
+														<MenuItem key={val} value={val}>
+															{val}
+														</MenuItem>
+													))}
+													<MenuItem value="">No step</MenuItem>
+												</TextField>
 											</>
 										) : (
 											<>
@@ -2311,33 +2349,16 @@ export function VenueDetailsPage() {
 												>
 													{unit.maxDurationMin ?? '—'}
 												</Typography>
+												<Typography
+													variant="body2"
+													color="text.secondary"
+													align="right"
+												>
+													{unit.slotStepMin ?? '—'}
+												</Typography>
 											</>
 										)}
 										<Stack direction="row" spacing={1} justifyContent="flex-end">
-											{isOwner && editingUnitId !== unit.id && (
-												<Button
-													size="small"
-													onClick={() => {
-														setEditingUnitId(unit.id);
-														setEditingUnitForm({
-															name: unit.name,
-															unitType: unit.unitType,
-															capacity: String(unit.capacity ?? ''),
-															minDurationMin: String(
-																unit.minDurationMin ?? '',
-															),
-															maxDurationMin: String(
-																unit.maxDurationMin ?? '',
-															),
-															slotStepMin: String(
-																unit.slotStepMin ?? '',
-															),
-														});
-													}}
-												>
-													Edit
-												</Button>
-											)}
 											{isOwner && editingUnitId === unit.id && (
 												<>
 													<Button
@@ -2392,17 +2413,39 @@ export function VenueDetailsPage() {
 													</Button>
 												</>
 											)}
-											{isOwner && (
-												<Button
-													size="small"
-													color="error"
-													disabled={deleteUnitMutation.isPending}
-													onClick={() => {
-														setDeleteUnitId(unit.id);
-													}}
-												>
-													Delete
-												</Button>
+											{isOwner && editingUnitId !== unit.id && (
+												<>
+													<Button
+														size="small"
+														onClick={() => {
+															setEditingUnitId(unit.id);
+															setEditingUnitForm({
+																name: unit.name,
+																unitType: unit.unitType,
+																capacity: String(unit.capacity ?? ''),
+																minDurationMin: String(
+																	unit.minDurationMin ?? '',
+																),
+																maxDurationMin: String(
+																	unit.maxDurationMin ?? '',
+																),
+																slotStepMin: String(
+																	unit.slotStepMin ?? '',
+																),
+															});
+														}}
+													>
+														Edit
+													</Button>
+													<Button
+														size="small"
+														color="error"
+														disabled={deleteUnitMutation.isPending}
+														onClick={() => setDeleteUnitId(unit.id)}
+													>
+														Delete
+													</Button>
+												</>
 											)}
 											{!isOwner && (
 												<Button
