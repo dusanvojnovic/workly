@@ -636,6 +636,21 @@ export function VenueDetailsPage() {
 		selectedUnitId,
 	]);
 
+	const isSlotPast = React.useCallback(
+		(slot: string) => {
+			if (!selectedDate) return false;
+			const now = dayjs();
+			if (!selectedDate.isSame(now, 'day')) return false;
+			const slotStart = selectedDate
+				.hour(Math.floor(toMinutes(slot) / 60))
+				.minute(toMinutes(slot) % 60)
+				.second(0)
+				.millisecond(0);
+			return slotStart.isBefore(now) || slotStart.isSame(now);
+		},
+		[selectedDate],
+	);
+
 	React.useEffect(() => {
 		setSelectedSlot(null);
 	}, [selectedUnitId, selectedOfferingId, selectedDate]);
@@ -1216,6 +1231,7 @@ export function VenueDetailsPage() {
 											label="Date"
 											value={selectedDate}
 											onChange={(value) => setSelectedDate(value)}
+											minDate={dayjs()}
 											slotProps={{
 												textField: {
 													size: 'small',
@@ -1306,6 +1322,7 @@ export function VenueDetailsPage() {
 																duration,
 															);
 															const isBlocked = !!blocked;
+															const isPast = isSlotPast(slot);
 
 																return (
 																<Chip
@@ -1313,24 +1330,26 @@ export function VenueDetailsPage() {
 																		label={label}
 																		size="medium"
 																	color={
-																		isBlocked
-																			? 'error'
-																			: isBusy
-																				? 'default'
-																				: 'success'
+																		isPast
+																			? 'default'
+																			: isBlocked
+																				? 'error'
+																				: isBusy
+																					? 'default'
+																					: 'success'
 																	}
 																		variant={
 																		isSelected
 																			? 'filled'
-																			: isBlocked || isBusy
+																			: isPast || isBlocked || isBusy
 																				? 'outlined'
 																				: 'outlined'
 																		}
 																		onClick={() => {
-																		if (isRequested || isBusy || isBlocked) return;
+																		if (isRequested || isBusy || isBlocked || isPast) return;
 																			setSelectedSlot(slot);
 																		}}
-																	title={blocked?.reason ?? undefined}
+																	title={blocked?.reason ?? (isPast ? 'This slot has passed' : undefined)}
 																		sx={{
 																			maxWidth: 200,
 																			px: 1.5,
@@ -1339,6 +1358,8 @@ export function VenueDetailsPage() {
 																				? 'rgba(255, 193, 7, 0.18)'
 																				: isSelected
 																					? 'rgba(76, 175, 80, 0.9)'
+																				: isPast
+																					? 'rgba(158, 158, 158, 0.08)'
 																				: isBlocked
 																					? 'rgba(244, 67, 54, 0.16)'
 																					: isBusy
@@ -1348,16 +1369,17 @@ export function VenueDetailsPage() {
 																				? 'common.white'
 																				: isRequested
 																					? 'warning.main'
-																				: isBlocked
-																					? 'error.main'
-																					: isBusy
-																						? 'text.secondary'
+																				: isPast || isBusy
+																					? 'text.secondary'
+																					: isBlocked
+																						? 'error.main'
 																						: 'inherit',
 																			cursor:
-																			isRequested || isBusy || isBlocked
+																			isRequested || isBusy || isBlocked || isPast
 																				? 'default'
 																				: 'pointer',
 																			borderWidth: isSelected ? 2 : 1,
+																			opacity: isPast ? 0.6 : 1,
 																		}}
 																	/>
 																);
@@ -1387,6 +1409,7 @@ export function VenueDetailsPage() {
 																duration,
 															);
 															const isBlocked = !!blocked;
+															const isPast = isSlotPast(slot);
 
 																return (
 																<Chip
@@ -1394,24 +1417,26 @@ export function VenueDetailsPage() {
 																		label={label}
 																		size="medium"
 																	color={
-																		isBlocked
-																			? 'error'
-																			: isBusy
-																				? 'default'
-																				: 'success'
+																		isPast
+																			? 'default'
+																			: isBlocked
+																				? 'error'
+																				: isBusy
+																					? 'default'
+																					: 'success'
 																	}
 																		variant={
 																		isSelected
 																			? 'filled'
-																			: isBlocked || isBusy
+																			: isPast || isBlocked || isBusy
 																				? 'outlined'
 																				: 'outlined'
 																		}
 																		onClick={() => {
-																		if (isRequested || isBusy || isBlocked) return;
+																		if (isRequested || isBusy || isBlocked || isPast) return;
 																			setSelectedSlot(slot);
 																		}}
-																	title={blocked?.reason ?? undefined}
+																	title={blocked?.reason ?? (isPast ? 'This slot has passed' : undefined)}
 																		sx={{
 																			maxWidth: 200,
 																			px: 1.5,
@@ -1420,6 +1445,8 @@ export function VenueDetailsPage() {
 																				? 'rgba(255, 193, 7, 0.18)'
 																				: isSelected
 																					? 'rgba(76, 175, 80, 0.9)'
+																				: isPast
+																					? 'rgba(158, 158, 158, 0.08)'
 																				: isBlocked
 																					? 'rgba(244, 67, 54, 0.16)'
 																					: isBusy
@@ -1429,16 +1456,17 @@ export function VenueDetailsPage() {
 																				? 'common.white'
 																				: isRequested
 																					? 'warning.main'
-																				: isBlocked
-																					? 'error.main'
-																					: isBusy
-																						? 'text.secondary'
+																				: isPast || isBusy
+																					? 'text.secondary'
+																					: isBlocked
+																						? 'error.main'
 																						: 'inherit',
 																			cursor:
-																			isRequested || isBusy || isBlocked
+																			isRequested || isBusy || isBlocked || isPast
 																				? 'default'
 																				: 'pointer',
 																			borderWidth: isSelected ? 2 : 1,
+																			opacity: isPast ? 0.6 : 1,
 																		}}
 																	/>
 																);
