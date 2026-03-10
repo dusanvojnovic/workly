@@ -458,6 +458,9 @@ export class VenuesService {
     if (Number.isNaN(startAt.getTime()))
       throw new BadRequestException('Invalid start time');
 
+    if (startAt <= new Date())
+      throw new BadRequestException('Cannot book a slot in the past');
+
     const endAt = new Date(
       startAt.getTime() + offering.durationMin * 60_000,
     );
@@ -596,6 +599,23 @@ export class VenuesService {
         rating: dto.rating,
         comment: dto.comment?.trim() || null,
       },
+    });
+  }
+
+  async cancelBooking(customerId: string, bookingId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+    });
+    if (!booking || booking.customerId !== customerId)
+      throw new NotFoundException('Booking not found');
+    if (booking.status === 'CANCELLED')
+      throw new BadRequestException('Booking is already cancelled');
+    if (booking.startAt <= new Date())
+      throw new BadRequestException('Cannot cancel a past booking');
+
+    return this.prisma.booking.update({
+      where: { id: bookingId },
+      data: { status: 'CANCELLED' },
     });
   }
 }

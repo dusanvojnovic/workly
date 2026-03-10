@@ -38,6 +38,13 @@ async function createReview(
 	return res.data;
 }
 
+async function cancelBooking(token: string, bookingId: string) {
+	const res = await api.patch(`/customer/bookings/${bookingId}/cancel`, {}, {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+	return res.data;
+}
+
 export function MyBookingsPage() {
 	const token = useAuthStore((s) => s.token);
 	const navigate = useNavigate();
@@ -48,6 +55,8 @@ export function MyBookingsPage() {
 	const [reviewRating, setReviewRating] = React.useState<number | null>(5);
 	const [reviewComment, setReviewComment] = React.useState('');
 	const [reviewError, setReviewError] = React.useState<string | null>(null);
+	const [cancelConfirmBooking, setCancelConfirmBooking] =
+		React.useState<BookingItem | null>(null);
 	const [filter, setFilter] = React.useState<'active' | 'done'>('active');
 
 	const {
@@ -85,6 +94,25 @@ export function MyBookingsPage() {
 		},
 	});
 
+	const [cancelError, setCancelError] = React.useState<string | null>(null);
+
+	const cancelBookingMutation = useMutation({
+		mutationFn: (bookingId: string) => cancelBooking(token!, bookingId),
+		onSuccess: () => {
+			setCancelConfirmBooking(null);
+			setCancelError(null);
+			queryClient.invalidateQueries({ queryKey: ['my-bookings', token] });
+		},
+		onError: (e: unknown) => {
+			const msg =
+				typeof e === 'object' && e !== null && 'response' in e
+					? (e as { response?: { data?: { message?: string } } })
+							.response?.data?.message
+					: undefined;
+			setCancelError(msg ?? 'Failed to cancel booking');
+		},
+	});
+
 	if (isLoading) {
 		return (
 			<Typography variant="body2" color="text.secondary">
@@ -103,8 +131,9 @@ export function MyBookingsPage() {
 	}
 
 	const now = dayjs();
-	const activeBookings = data.filter((booking) =>
-		dayjs(booking.endAt).isAfter(now),
+	const activeBookings = data.filter(
+		(booking) =>
+			booking.status !== 'CANCELLED' && dayjs(booking.endAt).isAfter(now),
 	);
 	const doneBookings = data.filter((booking) =>
 		dayjs(booking.endAt).isBefore(now),
@@ -218,6 +247,31 @@ export function MyBookingsPage() {
 										</Typography>
 									</Box>
 								</Stack>
+								{filter === 'active' && (
+									<Stack
+										direction="row"
+										justifyContent="flex-start"
+										sx={{ mt: 1 }}
+									>
+										<Button
+											size="small"
+											color="error"
+											variant="outlined"
+											onClick={() => {
+												setCancelError(null);
+												setCancelConfirmBooking(booking);
+											}}
+											sx={{
+												'&:hover': {
+													borderColor: 'error.main',
+													backgroundColor: 'rgba(211, 47, 47, 0.08)',
+												},
+											}}
+										>
+											Cancel reservation
+										</Button>
+									</Stack>
+								)}
 								{filter === 'done' && (
 									<Stack
 										direction={{ xs: 'column', sm: 'row' }}
@@ -266,6 +320,44 @@ export function MyBookingsPage() {
 					})}
 				</Stack>
 			)}
+			<Dialog
+				open={!!cancelConfirmBooking}
+				onClose={() => {
+					setCancelConfirmBooking(null);
+					setCancelError(null);
+				}}
+				maxWidth="xs"
+				fullWidth
+			>
+				<DialogTitle>Cancel reservation?</DialogTitle>
+				<DialogContent>
+					<Stack spacing={1}>
+						<Typography variant="body2" color="text.secondary">
+							Are you sure? This action cannot be undone.
+						</Typography>
+						{cancelError && (
+							<Alert severity="error">{cancelError}</Alert>
+						)}
+					</Stack>
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={() => setCancelConfirmBooking(null)}>
+						No
+					</Button>
+					<Button
+						color="error"
+						variant="contained"
+						disabled={cancelBookingMutation.isPending}
+						onClick={() => {
+							if (!cancelConfirmBooking) return;
+							cancelBookingMutation.mutate(cancelConfirmBooking.id);
+						}}
+					>
+						Yes
+					</Button>
+				</DialogActions>
+			</Dialog>
+
 			<Dialog
 				open={!!reviewBooking}
 				onClose={() => setReviewBooking(null)}
