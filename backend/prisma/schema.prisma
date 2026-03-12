@@ -76,6 +76,7 @@ model Venue {
 
     ratingAvg   Float @default(0)
     ratingCount Int   @default(0)
+    autoApprove Boolean @default(true)
 
     units      Unit[]
     offerings  Offering[]
@@ -113,8 +114,9 @@ model Unit {
     maxDurationMin Int?
     slotStepMin    Int?
 
-    bookings Booking[]
-    blocks   Block[]
+    bookings   Booking[]
+    blocks     Block[]
+    offerings  Offering[]
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
@@ -124,6 +126,8 @@ model Offering {
     id      String @id @default(uuid())
     venueId String
     venue   Venue  @relation(fields: [venueId], references: [id], onDelete: Cascade)
+    unitId  String
+    unit    Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
     name        String
     durationMin Int
@@ -210,6 +214,7 @@ model Favorite {
 
 enum NotificationType {
     NEW_BOOKING
+    BOOKING_CONFIRMED
     BOOKING_CANCELLED
 }
 
