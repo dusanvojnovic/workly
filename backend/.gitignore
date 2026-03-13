@@ -37,3 +37,6 @@ lerna-debug.log*
 
 
 .env
+
+# Uploaded venue images
+/uploads
