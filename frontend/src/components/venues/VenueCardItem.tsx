@@ -13,7 +13,15 @@ import {
     Typography,
 } from '@mui/material';
 
+import { api } from '../../api/api';
 import { type VenueCard } from '../../types/venue';
+
+function getImageUrl(imageUrl: string | null | undefined): string | null {
+	if (!imageUrl) return null;
+	if (imageUrl.startsWith('http')) return imageUrl;
+	const base = api.defaults.baseURL ?? '';
+	return `${base}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+}
 
 export function VenueCardItem({
 	v,
@@ -36,11 +44,15 @@ export function VenueCardItem({
 				'&:hover': { transform: 'translateY(-2px)' },
 			}}
 		>
-			{/* “Hero” header (no images yet) */}
 			<Box
 				sx={{
 					height: 160,
 					bgcolor: 'action.hover',
+					backgroundImage: getImageUrl(v.imageUrl)
+						? `url(${getImageUrl(v.imageUrl)})`
+						: 'none',
+					backgroundSize: 'cover',
+					backgroundPosition: 'center',
 					px: 2.5,
 					pt: 1.5,
 					pb: 2.5,
@@ -49,39 +61,54 @@ export function VenueCardItem({
 				}}
 			>
 				<Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-					<Chip
-						label={v.category}
-						size="medium"
-						variant="outlined"
-					/>
-					{onToggleFavorite && (
-						<Tooltip
-							title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-						>
-							<IconButton
-								size="small"
-								onClick={onToggleFavorite}
-								sx={{ color: isFavorite ? 'error.main' : 'action.active' }}
-								aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+						<Chip
+							label={v.category}
+							size="medium"
+							variant="outlined"
+							sx={{ bgcolor: 'background.paper' }}
+						/>
+						{onToggleFavorite && (
+							<Tooltip
+								title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
 							>
-								{isFavorite ? (
-									<FavoriteIcon fontSize="small" />
-								) : (
-									<FavoriteBorderIcon fontSize="small" />
-								)}
-							</IconButton>
-						</Tooltip>
-					)}
-				</Stack>
-				<Box sx={{ mt: 'auto' }}>
-					<Typography fontWeight={900} variant="h5" noWrap>
-						{v.name}
-					</Typography>
-					<Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }} flexWrap="wrap">
-						<LocationOnIcon fontSize="medium" />
-						<Typography variant="body1" color="text.secondary" noWrap>
-							{v.address ? `${v.city} • ${v.address}` : v.city}
+								<IconButton
+									size="small"
+									onClick={onToggleFavorite}
+									sx={{
+										color: isFavorite ? 'error.main' : 'action.active',
+										bgcolor: 'background.paper',
+										'&:hover': { bgcolor: 'background.paper' },
+									}}
+									aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+								>
+									{isFavorite ? (
+										<FavoriteIcon fontSize="small" />
+									) : (
+										<FavoriteBorderIcon fontSize="small" />
+									)}
+								</IconButton>
+							</Tooltip>
+						)}
+					</Stack>
+					<Box sx={{ mt: 'auto' }}>
+						<Typography
+							fontWeight={900}
+							variant="h5"
+							noWrap
+							sx={{ textShadow: getImageUrl(v.imageUrl) ? '0 1px 2px rgba(0,0,0,0.5)' : 'none' }}
+						>
+							{v.name}
 						</Typography>
+						<Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }} flexWrap="wrap">
+						<LocationOnIcon fontSize="medium" />
+							<Typography
+								variant="body1"
+								color="text.secondary"
+								noWrap
+								sx={{ textShadow: getImageUrl(v.imageUrl) ? '0 1px 2px rgba(0,0,0,0.4)' : 'none' }}
+							>
+								{v.address ? `${v.city} • ${v.address}` : v.city}
+							</Typography>
 						<Button
 							size="small"
 							variant="text"
@@ -99,9 +126,9 @@ export function VenueCardItem({
 						>
 							Show on map
 						</Button>
-					</Stack>
+						</Stack>
+					</Box>
 				</Box>
-			</Box>
 
 			<Box sx={{ p: 2.5 }}>
 				<Stack direction="row" gap={1.25} flexWrap="wrap" alignItems="center">

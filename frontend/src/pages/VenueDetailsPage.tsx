@@ -1,5 +1,7 @@
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import DeleteIcon from '@mui/icons-material/Delete';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import StarIcon from '@mui/icons-material/Star';
 import {
     Alert,
@@ -119,6 +121,43 @@ async function updateVenue(
 	const res = await api.patch<VenueDetails>(
 		`/provider/venues/${venueId}`,
 		payload,
+		{
+			headers: { Authorization: `Bearer ${token}` },
+		},
+	);
+	return res.data;
+}
+
+function getImageUrl(imageUrl: string | null | undefined): string | null {
+	if (!imageUrl) return null;
+	if (imageUrl.startsWith('http')) return imageUrl;
+	const base = api.defaults.baseURL ?? '';
+	return `${base}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+}
+
+async function uploadVenueImage(
+	token: string,
+	venueId: string,
+	file: File,
+) {
+	const formData = new FormData();
+	formData.append('file', file);
+	const res = await api.post<VenueDetails>(
+		`/provider/venues/${venueId}/image`,
+		formData,
+		{
+			headers: {
+				Authorization: `Bearer ${token}`,
+				'Content-Type': 'multipart/form-data',
+			},
+		},
+	);
+	return res.data;
+}
+
+async function removeVenueImage(token: string, venueId: string) {
+	const res = await api.delete<VenueDetails>(
+		`/provider/venues/${venueId}/image`,
 		{
 			headers: { Authorization: `Bearer ${token}` },
 		},
@@ -421,7 +460,24 @@ export function VenueDetailsPage() {
 			updateVenue(token!, venueId, payload),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['venue', venueId] });
+			queryClient.invalidateQueries({ queryKey: ['venues'] });
 			setIsEditingVenue(false);
+		},
+	});
+
+	const uploadImageMutation = useMutation({
+		mutationFn: (file: File) => uploadVenueImage(token!, venueId, file),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['venue', venueId] });
+			queryClient.invalidateQueries({ queryKey: ['venues'] });
+		},
+	});
+
+	const removeImageMutation = useMutation({
+		mutationFn: () => removeVenueImage(token!, venueId),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['venue', venueId] });
+			queryClient.invalidateQueries({ queryKey: ['venues'] });
 		},
 	});
 
@@ -881,6 +937,19 @@ export function VenueDetailsPage() {
 					</Button>
 				</DialogActions>
 			</Dialog>
+			{venue.imageUrl && getImageUrl(venue.imageUrl) && (
+				<Box
+					sx={{
+						height: 220,
+						borderRadius: 2,
+						mb: 2,
+						overflow: 'hidden',
+						backgroundImage: `url(${getImageUrl(venue.imageUrl)})`,
+						backgroundSize: 'cover',
+						backgroundPosition: 'center',
+					}}
+				/>
+			)}
 			<Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2 }}>
 				<Stack
 					direction={{ xs: 'column', md: 'row' }}
@@ -1027,6 +1096,70 @@ export function VenueDetailsPage() {
 					<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
 						<Stack spacing={2}>
 							<Typography fontWeight={800}>Edit venue</Typography>
+							{/* Image upload */}
+							<Stack spacing={1}>
+								<Typography variant="subtitle2" color="text.secondary">
+									Venue image
+								</Typography>
+								<Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap">
+									{venue.imageUrl && (
+										<Box
+											sx={{
+												width: 120,
+												height: 80,
+												borderRadius: 1,
+												overflow: 'hidden',
+												bgcolor: 'action.hover',
+											}}
+										>
+											<img
+												src={getImageUrl(venue.imageUrl) ?? ''}
+												alt={venue.name}
+												style={{
+													width: '100%',
+													height: '100%',
+													objectFit: 'cover',
+												}}
+											/>
+										</Box>
+									)}
+									<Stack direction="row" spacing={1}>
+										<Button
+											component="label"
+											variant="outlined"
+											size="small"
+											startIcon={<PhotoCameraIcon />}
+											disabled={uploadImageMutation.isPending}
+										>
+											{venue.imageUrl ? 'Change' : 'Upload'}
+											<input
+												type="file"
+												hidden
+												accept="image/jpeg,image/png,image/webp,image/gif"
+												onChange={(e) => {
+													const file = e.target.files?.[0];
+													if (file) {
+														uploadImageMutation.mutate(file);
+														e.target.value = '';
+													}
+												}}
+											/>
+										</Button>
+										{venue.imageUrl && (
+											<Button
+												variant="outlined"
+												size="small"
+												color="error"
+												startIcon={<DeleteIcon />}
+												onClick={() => removeImageMutation.mutate()}
+												disabled={removeImageMutation.isPending}
+											>
+												Remove
+											</Button>
+										)}
+									</Stack>
+								</Stack>
+							</Stack>
 							<Stack
 								direction={{ xs: 'column', md: 'row' }}
 								spacing={2}

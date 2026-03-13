@@ -9,6 +9,7 @@ export interface VenueCard {
 	priceFrom: number | null;
 	avgRating: number | null;
 	reviewsCount: number;
+	imageUrl?: string | null;
 }
 
 export interface Unit {
@@ -55,6 +56,7 @@ export interface VenueDetails {
 	address?: string | null;
 	slotStepMin?: number | null;
 	autoApprove?: boolean;
+	imageUrl?: string | null;
 	units: Unit[];
 	offerings: Offering[];
 	schedules: VenueSchedule[];
