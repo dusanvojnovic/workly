@@ -35,19 +35,21 @@ async function main() {
       name: 'Arena Sport Center',
       city: 'Belgrade',
       address: 'Dorcol 12',
-      units: {
-        create: [
-          { name: 'Court #1', unitType: 'COURT', capacity: 4 },
-          { name: 'Court #2', unitType: 'COURT', capacity: 4 },
-        ],
-      },
-      offerings: {
-        create: [
-          { name: 'Court 60 min', durationMin: 60, price: 20 },
-          { name: 'Court 90 min', durationMin: 90, price: 28 },
-        ],
-      },
     },
+  });
+
+  const unit1 = await prisma.unit.create({
+    data: { venueId: venue.id, name: 'Court #1', unitType: 'COURT', capacity: 4 },
+  });
+  const unit2 = await prisma.unit.create({
+    data: { venueId: venue.id, name: 'Court #2', unitType: 'COURT', capacity: 4 },
+  });
+
+  await prisma.offering.createMany({
+    data: [
+      { venueId: venue.id, unitId: unit1.id, name: 'Court 60 min', durationMin: 60, price: 20 },
+      { venueId: venue.id, unitId: unit2.id, name: 'Court 90 min', durationMin: 90, price: 28 },
+    ],
   });
 
   console.log('Seeded venue:', venue.name);
