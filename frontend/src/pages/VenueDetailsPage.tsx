@@ -1,13 +1,19 @@
+import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
+import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
+import CollectionsIcon from '@mui/icons-material/Collections';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 import StarIcon from '@mui/icons-material/Star';
 import {
     Alert,
     Box,
     Button,
     Chip,
+    IconButton,
     Dialog,
     DialogActions,
     DialogContent,
@@ -18,6 +24,12 @@ import {
     Select,
     Snackbar,
     Stack,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
     TextField,
     Typography,
 } from '@mui/material';
@@ -32,7 +44,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 import * as React from 'react';
 import { api } from '../api/api';
 import { useAuthStore } from '../store/auth.store';
-import { type Unit, type VenueDetails, type VenueReview } from '../types/venue';
+import { type Unit, type VenueDetails, type VenueImage, type VenueReview } from '../types/venue';
 
 type UpdateVenuePayload = {
 	category?: string;
@@ -135,6 +147,209 @@ function getImageUrl(imageUrl: string | null | undefined): string | null {
 	return `${base}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
 }
 
+function VenueGallery({
+	images,
+	legacyImageUrl,
+	getImageUrl,
+	selectedIndex,
+	onGalleryClick,
+}: {
+	images: VenueImage[];
+	legacyImageUrl?: string | null;
+	getImageUrl: (path: string | null | undefined) => string | null;
+	selectedIndex: number;
+	onGalleryClick?: () => void;
+}) {
+	const displayImages =
+		images.length > 0
+			? images
+			: legacyImageUrl
+				? [{ id: 'legacy', path: legacyImageUrl, order: 0 }]
+				: [];
+	const selectedPath = displayImages[selectedIndex]?.path;
+	const hasMultiple = displayImages.length > 1;
+
+	if (displayImages.length === 0) return null;
+
+	return (
+		<Box sx={{ mb: 2, position: 'relative' }}>
+			<Box
+				sx={{
+					height: 220,
+					borderRadius: 2,
+					overflow: 'hidden',
+					backgroundImage: selectedPath ? `url(${getImageUrl(selectedPath)})` : 'none',
+					backgroundSize: 'cover',
+					backgroundPosition: 'center',
+					bgcolor: 'action.hover',
+				}}
+			/>
+			{hasMultiple && onGalleryClick && (
+				<Button
+					startIcon={<CollectionsIcon />}
+					onClick={onGalleryClick}
+					sx={{
+						position: 'absolute',
+						bottom: 12,
+						right: 12,
+						bgcolor: 'rgba(0,0,0,0.6)',
+						color: 'white',
+						'&:hover': { bgcolor: 'rgba(0,0,0,0.8)' },
+					}}
+				>
+					Gallery
+				</Button>
+			)}
+		</Box>
+	);
+}
+
+function GalleryLightbox({
+	images,
+	legacyImageUrl,
+	getImageUrl,
+	venueName,
+	open,
+	initialIndex,
+	onClose,
+}: {
+	images: VenueImage[];
+	legacyImageUrl?: string | null;
+	getImageUrl: (path: string | null | undefined) => string | null;
+	venueName: string;
+	open: boolean;
+	initialIndex: number;
+	onClose: () => void;
+}) {
+	const displayImages =
+		images.length > 0
+			? images
+			: legacyImageUrl
+				? [{ id: 'legacy', path: legacyImageUrl, order: 0 }]
+				: [];
+	const [index, setIndex] = React.useState(initialIndex);
+
+	React.useEffect(() => {
+		if (open) setIndex(initialIndex);
+	}, [open, initialIndex]);
+
+	React.useEffect(() => {
+		if (!open) return;
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') onClose();
+			else if (e.key === 'ArrowLeft') setIndex((i) => (i <= 0 ? displayImages.length - 1 : i - 1));
+			else if (e.key === 'ArrowRight') setIndex((i) => (i >= displayImages.length - 1 ? 0 : i + 1));
+		};
+		window.addEventListener('keydown', onKey);
+		return () => window.removeEventListener('keydown', onKey);
+	}, [open, onClose, displayImages.length]);
+
+	if (displayImages.length === 0) return null;
+
+	const prev = () => setIndex((i) => (i <= 0 ? displayImages.length - 1 : i - 1));
+	const next = () => setIndex((i) => (i >= displayImages.length - 1 ? 0 : i + 1));
+	const currentPath = displayImages[index]?.path;
+
+	return (
+		<Dialog
+			open={open}
+			onClose={onClose}
+			fullScreen
+			PaperProps={{
+				sx: {
+					bgcolor: '#0a0a0a',
+					backgroundImage: 'none',
+				},
+			}}
+			sx={{
+				'& .MuiDialog-container': { alignItems: 'stretch' },
+			}}
+		>
+			<Box
+				sx={{
+					display: 'flex',
+					flexDirection: 'column',
+					height: '100%',
+					position: 'relative',
+				}}
+			>
+				<Stack
+					direction="row"
+					alignItems="center"
+					justifyContent="space-between"
+					sx={{ p: 2, position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1 }}
+				>
+					<Typography variant="h6" color="white" fontWeight={700}>
+						{venueName}
+					</Typography>
+					<IconButton onClick={onClose} sx={{ color: 'white' }} size="large">
+						<CloseIcon />
+					</IconButton>
+				</Stack>
+
+				<Box
+					sx={{
+						flex: 1,
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: 'center',
+						position: 'relative',
+						py: 8,
+					}}
+				>
+					<IconButton
+						onClick={prev}
+						sx={{
+							position: 'absolute',
+							left: 16,
+							top: '50%',
+							transform: 'translateY(-50%)',
+							color: 'white',
+							bgcolor: 'rgba(255,255,255,0.15)',
+							'&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
+						}}
+						size="large"
+					>
+						<ArrowBackIosNewIcon />
+					</IconButton>
+					<Box
+						component="img"
+						src={getImageUrl(currentPath) ?? ''}
+						alt=""
+						sx={{
+							maxWidth: '100%',
+							maxHeight: '100%',
+							objectFit: 'contain',
+						}}
+					/>
+					<IconButton
+						onClick={next}
+						sx={{
+							position: 'absolute',
+							right: 16,
+							top: '50%',
+							transform: 'translateY(-50%)',
+							color: 'white',
+							bgcolor: 'rgba(255,255,255,0.15)',
+							'&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
+						}}
+						size="large"
+					>
+						<ArrowForwardIosIcon />
+					</IconButton>
+				</Box>
+
+				<Typography
+					color="white"
+					sx={{ position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)' }}
+				>
+					{index + 1} od {displayImages.length}
+				</Typography>
+			</Box>
+		</Dialog>
+	);
+}
+
 async function uploadVenueImage(
 	token: string,
 	venueId: string,
@@ -142,27 +357,18 @@ async function uploadVenueImage(
 ) {
 	const formData = new FormData();
 	formData.append('file', file);
-	const res = await api.post<VenueDetails>(
-		`/provider/venues/${venueId}/image`,
-		formData,
-		{
-			headers: {
-				Authorization: `Bearer ${token}`,
-				'Content-Type': 'multipart/form-data',
-			},
+	await api.post(`/provider/venues/${venueId}/image`, formData, {
+		headers: {
+			Authorization: `Bearer ${token}`,
+			'Content-Type': 'multipart/form-data',
 		},
-	);
-	return res.data;
+	});
 }
 
-async function removeVenueImage(token: string, venueId: string) {
-	const res = await api.delete<VenueDetails>(
-		`/provider/venues/${venueId}/image`,
-		{
-			headers: { Authorization: `Bearer ${token}` },
-		},
-	);
-	return res.data;
+async function removeVenueImage(token: string, venueId: string, imageId: string) {
+	await api.delete(`/provider/venues/${venueId}/images/${imageId}`, {
+		headers: { Authorization: `Bearer ${token}` },
+	});
 }
 
 async function createUnit(
@@ -413,6 +619,7 @@ export function VenueDetailsPage() {
 		severity: 'success' | 'error';
 	} | null>(null);
 	const [reviewsDialogOpen, setReviewsDialogOpen] = React.useState(false);
+	const [galleryLightboxOpen, setGalleryLightboxOpen] = React.useState(false);
 
 	React.useEffect(() => {
 		if (!venue) return;
@@ -474,7 +681,7 @@ export function VenueDetailsPage() {
 	});
 
 	const removeImageMutation = useMutation({
-		mutationFn: () => removeVenueImage(token!, venueId),
+		mutationFn: (imageId: string) => removeVenueImage(token!, venueId, imageId),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['venue', venueId] });
 			queryClient.invalidateQueries({ queryKey: ['venues'] });
@@ -937,18 +1144,25 @@ export function VenueDetailsPage() {
 					</Button>
 				</DialogActions>
 			</Dialog>
-			{venue.imageUrl && getImageUrl(venue.imageUrl) && (
-				<Box
-					sx={{
-						height: 220,
-						borderRadius: 2,
-						mb: 2,
-						overflow: 'hidden',
-						backgroundImage: `url(${getImageUrl(venue.imageUrl)})`,
-						backgroundSize: 'cover',
-						backgroundPosition: 'center',
-					}}
-				/>
+			{((venue.images?.length ?? 0) > 0 || venue.imageUrl) && (
+				<>
+					<VenueGallery
+						images={venue.images ?? []}
+						legacyImageUrl={venue.imageUrl}
+						getImageUrl={getImageUrl}
+						selectedIndex={0}
+						onGalleryClick={() => setGalleryLightboxOpen(true)}
+					/>
+					<GalleryLightbox
+						images={venue.images ?? []}
+						legacyImageUrl={venue.imageUrl}
+						getImageUrl={getImageUrl}
+						venueName={venue.name}
+						open={galleryLightboxOpen}
+						initialIndex={0}
+						onClose={() => setGalleryLightboxOpen(false)}
+					/>
+				</>
 			)}
 			<Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2 }}>
 				<Stack
@@ -962,6 +1176,22 @@ export function VenueDetailsPage() {
 							<Typography variant="h5" fontWeight={900}>
 								{venue.name}
 							</Typography>
+							{venue.availableToday ? (
+								<Chip
+									icon={<CheckCircleIcon sx={{ fontSize: 18 }} />}
+									label="Available today"
+									size="small"
+									color="success"
+									variant="outlined"
+								/>
+							) : venue.nextAvailableDay ? (
+								<Chip
+									icon={<ScheduleIcon sx={{ fontSize: 18 }} />}
+									label={`Next: ${venue.nextAvailableDay}`}
+									size="small"
+									variant="outlined"
+								/>
+							) : null}
 							{venue.avgRating != null && venue.reviewsCount != null && venue.reviewsCount > 0 && (
 								<Stack direction="row" alignItems="center" spacing={0.5}>
 									<StarIcon sx={{ color: 'warning.main', fontSize: 22 }} />
@@ -1096,68 +1326,94 @@ export function VenueDetailsPage() {
 					<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
 						<Stack spacing={2}>
 							<Typography fontWeight={800}>Edit venue</Typography>
-							{/* Image upload */}
+							{/* Image gallery */}
 							<Stack spacing={1}>
 								<Typography variant="subtitle2" color="text.secondary">
-									Venue image
+									Venue gallery
 								</Typography>
 								<Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap">
-									{venue.imageUrl && (
-										<Box
-											sx={{
-												width: 120,
-												height: 80,
-												borderRadius: 1,
-												overflow: 'hidden',
-												bgcolor: 'action.hover',
+									{(venue.images ?? []).length > 0
+										? venue.images!.map((img) => (
+												<Box
+													key={img.id}
+													sx={{
+														position: 'relative',
+														width: 120,
+														height: 80,
+														borderRadius: 1,
+														overflow: 'hidden',
+														bgcolor: 'action.hover',
+													}}
+												>
+													<img
+														src={getImageUrl(img.path) ?? ''}
+														alt=""
+														style={{
+															width: '100%',
+															height: '100%',
+															objectFit: 'cover',
+														}}
+													/>
+													<IconButton
+														size="small"
+														sx={{
+															position: 'absolute',
+															top: 4,
+															right: 4,
+															bgcolor: 'rgba(0,0,0,0.5)',
+															color: 'white',
+															'&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
+														}}
+														onClick={() => removeImageMutation.mutate(img.id)}
+														disabled={removeImageMutation.isPending}
+													>
+														<DeleteIcon fontSize="small" />
+													</IconButton>
+												</Box>
+										  ))
+										: venue.imageUrl && (
+												<Box
+													sx={{
+														position: 'relative',
+														width: 120,
+														height: 80,
+														borderRadius: 1,
+														overflow: 'hidden',
+														bgcolor: 'action.hover',
+													}}
+												>
+													<img
+														src={getImageUrl(venue.imageUrl) ?? ''}
+														alt=""
+														style={{
+															width: '100%',
+															height: '100%',
+															objectFit: 'cover',
+														}}
+													/>
+												</Box>
+										  )}
+									<Button
+										component="label"
+										variant="outlined"
+										size="small"
+										startIcon={<PhotoCameraIcon />}
+										disabled={uploadImageMutation.isPending}
+									>
+										Add image
+										<input
+											type="file"
+											hidden
+											accept="image/jpeg,image/png,image/webp,image/gif"
+											onChange={(e) => {
+												const file = e.target.files?.[0];
+												if (file) {
+													uploadImageMutation.mutate(file);
+													e.target.value = '';
+												}
 											}}
-										>
-											<img
-												src={getImageUrl(venue.imageUrl) ?? ''}
-												alt={venue.name}
-												style={{
-													width: '100%',
-													height: '100%',
-													objectFit: 'cover',
-												}}
-											/>
-										</Box>
-									)}
-									<Stack direction="row" spacing={1}>
-										<Button
-											component="label"
-											variant="outlined"
-											size="small"
-											startIcon={<PhotoCameraIcon />}
-											disabled={uploadImageMutation.isPending}
-										>
-											{venue.imageUrl ? 'Change' : 'Upload'}
-											<input
-												type="file"
-												hidden
-												accept="image/jpeg,image/png,image/webp,image/gif"
-												onChange={(e) => {
-													const file = e.target.files?.[0];
-													if (file) {
-														uploadImageMutation.mutate(file);
-														e.target.value = '';
-													}
-												}}
-											/>
-										</Button>
-										{venue.imageUrl && (
-											<Button
-												variant="outlined"
-												size="small"
-												color="error"
-												startIcon={<DeleteIcon />}
-												onClick={() => removeImageMutation.mutate()}
-												disabled={removeImageMutation.isPending}
-											>
-												Remove
-											</Button>
-										)}
-									</Stack>
+										/>
+									</Button>
 								</Stack>
 							</Stack>
 							<Stack
@@ -1682,7 +1938,7 @@ export function VenueDetailsPage() {
 										md: 'minmax(240px, 0.32fr) 1fr',
 									},
 									gap: 2,
-									alignItems: 'stretch',
+									alignItems: 'start',
 								}),
 					}}
 				>
@@ -2332,7 +2588,14 @@ export function VenueDetailsPage() {
 						)}
 				</Paper>
 
-				<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+				<Paper
+					variant="outlined"
+					sx={{
+						p: 2,
+						borderRadius: 2,
+						...(isOwner ? {} : { gridColumn: '1 / -1' }),
+					}}
+				>
 					<Stack
 						direction={{ xs: 'column', md: 'row' }}
 						justifyContent="space-between"
@@ -2463,195 +2726,186 @@ export function VenueDetailsPage() {
 								No offerings yet.
 							</Typography>
 						) : (
-							<Stack spacing={1}>
-								<Box
-									sx={{
-										display: 'grid',
-										gridTemplateColumns: isOwner
-											? 'minmax(140px, 1.4fr) minmax(100px, 0.7fr) minmax(90px, 0.6fr) minmax(120px, 1fr)'
-											: 'minmax(140px, 1.4fr) minmax(100px, 0.7fr) minmax(90px, 0.6fr)',
-										gap: 1.5,
-										px: 1,
-										alignItems: 'center',
-										color: 'text.secondary',
-									}}
-								>
-									<Typography variant="caption" noWrap>
-										Name
-									</Typography>
-									<Typography variant="caption" noWrap align="right">
-										Duration
-									</Typography>
-									<Typography variant="caption" noWrap align="right">
-										Price
-									</Typography>
-									{isOwner && (
-										<Typography variant="caption" noWrap align="right">
-											Actions
-										</Typography>
-									)}
-								</Box>
-
+							<TableContainer
+								sx={{
+									'& .MuiTableCell-root': { border: 'none' },
+								}}
+							>
+								<Table size="small">
+									<TableHead>
+										<TableRow>
+											<TableCell sx={{ fontWeight: 700 }}>Name</TableCell>
+											<TableCell align="right" sx={{ fontWeight: 700 }}>Duration</TableCell>
+											<TableCell align="right" sx={{ fontWeight: 700 }}>Price</TableCell>
+											{isOwner && (
+												<TableCell align="right" sx={{ fontWeight: 700 }}>Actions</TableCell>
+											)}
+										</TableRow>
+									</TableHead>
+									<TableBody>
 								{venue.offerings.map((offering) => (
-									<Paper key={offering.id} variant="outlined" sx={{ p: 1.5 }}>
-										<Box
-											sx={{
-												display: 'grid',
-												gridTemplateColumns: isOwner
-													? 'minmax(140px, 1.4fr) minmax(100px, 0.7fr) minmax(90px, 0.6fr) minmax(120px, 1fr)'
-													: 'minmax(140px, 1.4fr) minmax(100px, 0.7fr) minmax(90px, 0.6fr)',
-												gap: 1.5,
-												alignItems: 'center',
-											}}
-										>
+									<TableRow key={offering.id}>
 											{editingOfferingId === offering.id ? (
 												<>
-													<TextField
-														size="small"
-														value={editingOfferingForm.name}
-														onChange={(e) =>
-															setEditingOfferingForm((prev) => ({
-																...prev,
-																name: e.target.value,
-															}))
-														}
-													/>
-													<TextField
-														size="small"
-														select
-														value={editingOfferingForm.durationMin}
-														onChange={(e) =>
-															setEditingOfferingForm((prev) => ({
-																...prev,
-																durationMin: e.target.value,
-															}))
-														}
-													>
-														{getDurationOptionsForUnit(
-															units.find(
-																(u) => u.id === editingOfferingForm.unitId,
-															),
-														).map((val) => (
-															<MenuItem key={val} value={val}>
-																{val}
-															</MenuItem>
-														))}
-													</TextField>
-													<TextField
-														size="small"
-														type="number"
-														value={editingOfferingForm.price}
-														onChange={(e) =>
-															setEditingOfferingForm((prev) => ({
-																...prev,
-																price: e.target.value,
-															}))
-														}
-													/>
-													<Stack direction="row" spacing={1} justifyContent="flex-end">
-														<Button
+													<TableCell>
+														<TextField
 															size="small"
-															variant="contained"
-															disabled={updateOfferingMutation.isPending}
-															onClick={() => {
-																const durationMin = String(
-																	editingOfferingForm.durationMin,
-																).trim()
-																	? Number(editingOfferingForm.durationMin)
-																	: NaN;
-																const price = String(
-																	editingOfferingForm.price,
-																).trim()
-																	? Number(editingOfferingForm.price)
-																	: undefined;
-
-																if (
-																	!editingOfferingForm.name.trim() ||
-																	Number.isNaN(durationMin)
-																) {
-																	setOfferingToast({
-																		message: 'Please fill name and duration',
-																		severity: 'error',
-																	});
-																	return;
-																}
-
-																updateOfferingMutation.mutate({
-																	offeringId: offering.id,
-																	data: {
-																		name: editingOfferingForm.name.trim(),
-																		durationMin,
-																		price: Number.isNaN(price)
-																			? undefined
-																			: price,
-																	},
-																});
-															}}
-														>
-															Save
-														</Button>
-														<Button
+															value={editingOfferingForm.name}
+															onChange={(e) =>
+																setEditingOfferingForm((prev) => ({
+																	...prev,
+																	name: e.target.value,
+																}))
+															}
+														/>
+													</TableCell>
+													<TableCell align="right">
+														<TextField
 															size="small"
-															onClick={() => setEditingOfferingId(null)}
+															select
+															value={editingOfferingForm.durationMin}
+															onChange={(e) =>
+																setEditingOfferingForm((prev) => ({
+																	...prev,
+																	durationMin: e.target.value,
+																}))
+															}
+															sx={{ minWidth: 80 }}
 														>
-															Cancel
-														</Button>
-													</Stack>
+															{getDurationOptionsForUnit(
+																units.find(
+																	(u) => u.id === editingOfferingForm.unitId,
+																),
+															).map((val) => (
+																<MenuItem key={val} value={val}>
+																	{val}
+																</MenuItem>
+															))}
+														</TextField>
+													</TableCell>
+													<TableCell align="right">
+														<TextField
+															size="small"
+															type="number"
+															value={editingOfferingForm.price}
+															onChange={(e) =>
+																setEditingOfferingForm((prev) => ({
+																	...prev,
+																	price: e.target.value,
+																}))
+															}
+															sx={{ width: 100 }}
+														/>
+													</TableCell>
+													{isOwner && (
+														<TableCell align="right">
+															<Stack direction="row" spacing={1} justifyContent="flex-end">
+																<Button
+																	size="small"
+																	variant="contained"
+																	disabled={updateOfferingMutation.isPending}
+																	onClick={() => {
+																		const durationMin = String(
+																			editingOfferingForm.durationMin,
+																		).trim()
+																			? Number(editingOfferingForm.durationMin)
+																			: NaN;
+																		const price = String(
+																			editingOfferingForm.price,
+																		).trim()
+																			? Number(editingOfferingForm.price)
+																			: undefined;
+
+																		if (
+																			!editingOfferingForm.name.trim() ||
+																			Number.isNaN(durationMin)
+																		) {
+																			setOfferingToast({
+																				message: 'Please fill name and duration',
+																				severity: 'error',
+																			});
+																			return;
+																		}
+
+																		updateOfferingMutation.mutate({
+																			offeringId: offering.id,
+																			data: {
+																				name: editingOfferingForm.name.trim(),
+																				durationMin,
+																				price: Number.isNaN(price)
+																					? undefined
+																					: price,
+																			},
+																		});
+																	}}
+																>
+																	Save
+																</Button>
+																<Button
+																	size="small"
+																	onClick={() => setEditingOfferingId(null)}
+																>
+																	Cancel
+																</Button>
+															</Stack>
+														</TableCell>
+													)}
 												</>
 											) : (
 												<>
-													<Typography fontWeight={700} noWrap>
-														{offering.name}
-													</Typography>
-													<Typography
-														variant="body2"
-														color="text.secondary"
-														align="right"
-													>
-														{offering.durationMin} min
-													</Typography>
-													<Typography
-														variant="body2"
-														color="text.secondary"
-														align="right"
-													>
-														{offering.price != null ? `${offering.price} RSD` : '—'}
-													</Typography>
+													<TableCell>
+														<Typography fontWeight={700} noWrap>
+															{offering.name}
+														</Typography>
+													</TableCell>
+													<TableCell align="right">
+														<Typography variant="body2" color="text.secondary">
+															{offering.durationMin} min
+														</Typography>
+													</TableCell>
+													<TableCell align="right">
+														<Typography variant="body2" color="text.secondary">
+															{offering.price != null ? `${offering.price} RSD` : '—'}
+														</Typography>
+													</TableCell>
 													{isOwner && (
-														<Stack direction="row" spacing={1} justifyContent="flex-end">
-															<Button
-																size="small"
-																onClick={() => {
-																	setEditingOfferingId(offering.id);
-																	setEditingOfferingForm({
-																		unitId: offering.unitId ?? '',
-																		name: offering.name,
-																		durationMin: String(offering.durationMin),
-																		price:
-																			offering.price != null
-																				? String(offering.price)
-																				: '',
-																	});
-																}}
-															>
-																Edit
-															</Button>
-															<Button
-																size="small"
-																color="error"
-																disabled={deleteOfferingMutation.isPending}
-																onClick={() => setDeleteOfferingId(offering.id)}
-															>
-																Delete
-															</Button>
-														</Stack>
+														<TableCell align="right">
+															<Stack direction="row" spacing={1} justifyContent="flex-end">
+																<Button
+																	size="small"
+																	onClick={() => {
+																		setEditingOfferingId(offering.id);
+																		setEditingOfferingForm({
+																			unitId: offering.unitId ?? '',
+																			name: offering.name,
+																			durationMin: String(offering.durationMin),
+																			price:
+																				offering.price != null
+																					? String(offering.price)
+																					: '',
+																		});
+																	}}
+																>
+																	Edit
+																</Button>
+																<Button
+																	size="small"
+																	color="error"
+																	disabled={deleteOfferingMutation.isPending}
+																	onClick={() => setDeleteOfferingId(offering.id)}
+																>
+																	Delete
+																</Button>
+															</Stack>
+														</TableCell>
 													)}
 												</>
 											)}
-										</Box>
-									</Paper>
+									</TableRow>
 								))}
-							</Stack>
+									</TableBody>
+								</Table>
+							</TableContainer>
 						)}
 				</Paper>
 				</Box>

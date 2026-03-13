@@ -10,6 +10,8 @@ export interface VenueCard {
 	avgRating: number | null;
 	reviewsCount: number;
 	imageUrl?: string | null;
+	availableToday?: boolean;
+	nextAvailableDay?: string | null;
 }
 
 export interface Unit {
@@ -46,6 +48,12 @@ export interface VenueReview {
 	createdAt: string;
 }
 
+export interface VenueImage {
+	id: string;
+	path: string;
+	order: number;
+}
+
 export interface VenueDetails {
 	id: string;
 	providerId: string;
@@ -57,10 +65,13 @@ export interface VenueDetails {
 	slotStepMin?: number | null;
 	autoApprove?: boolean;
 	imageUrl?: string | null;
+	images?: VenueImage[];
 	units: Unit[];
 	offerings: Offering[];
 	schedules: VenueSchedule[];
 	reviews?: VenueReview[];
 	avgRating?: number | null;
 	reviewsCount?: number;
+	availableToday?: boolean;
+	nextAvailableDay?: string | null;
 }
